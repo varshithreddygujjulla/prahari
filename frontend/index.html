@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRAHARI · Evidence Board · SIH 26189</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --wall:#2A2622; --cork:#B08B5A; --paper:#F5EFE0; --paper2:#EFE6CF;
+  --ink:#2B2620; --faded:#6E6353; --red:#C0392B; --redink:#A02818;
+  --amber:#B87E1F; --violet:#7C5CBF; --blue:#2F5FA8; --green:#2F7D4F;
+  --type:"Special Elite",monospace; --hand:"Caveat",cursive; --mono:"IBM Plex Mono",monospace;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--wall);color:var(--ink);font:14px/1.5 var(--type);overflow:hidden}
+
+/* ---------- the board & lighting ---------- */
+#graph{position:fixed;inset:72px 0 36px 0;z-index:2;
+  background:
+    radial-gradient(700px 320px at 28% -40px, rgba(255,244,214,.42), transparent 70%),
+    radial-gradient(700px 320px at 72% -40px, rgba(255,244,214,.42), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .06 0 0 0 0 .04 0 0 0 0 .02 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(1200px 800px at 50% 30%, #C29A66, #A57F4E 60%, #8F6C40 100%);
+  box-shadow:inset 0 0 160px rgba(30,18,8,.65), inset 0 14px 40px rgba(30,18,8,.5)}
+.lamp{position:fixed;top:58px;width:120px;height:26px;border-radius:0 0 60px 60px;
+  background:linear-gradient(#111,#333);z-index:5;box-shadow:0 4px 30px rgba(255,240,190,.5)}
+.lamp::after{content:"";position:absolute;left:14px;right:14px;bottom:-6px;height:10px;
+  border-radius:50%;background:rgba(255,246,214,.9);filter:blur(4px)}
+#lampA{left:24%}#lampB{left:68%}
+
+/* ---------- header ---------- */
+header{position:fixed;inset:0 0 auto 0;height:72px;z-index:40;display:flex;
+  align-items:center;gap:12px;padding:0 16px;
+  background:linear-gradient(#201C18,#2A2622);
+  border-bottom:3px solid #17130F;color:var(--paper)}
+.brand{display:flex;align-items:baseline;gap:10px;flex-shrink:0}
+.brand b{font:400 22px var(--type);letter-spacing:.16em;color:var(--paper)}
+.brand span{font:500 10px var(--mono);letter-spacing:.2em;color:#8C8172}
+.case{font:400 12px var(--type);letter-spacing:.08em;color:#CDbFa8;border:1px dashed #574F44;
+  padding:3px 10px;border-radius:2px;flex-shrink:0}
+.case i{color:#E8B84B;font-style:normal}
+/* live stats line — populated after boot */
+#statline{font:400 11px var(--mono);color:#A89A78;letter-spacing:.05em;
+  background:rgba(255,255,255,.05);border:1px solid #3E362C;
+  padding:3px 10px;border-radius:2px;white-space:nowrap}
+#search{margin-left:auto;width:200px;background:#F5EFE0;border:2px solid #17130F;border-radius:2px;
+  color:var(--ink);font:13px var(--type);padding:6px 10px;outline:0;box-shadow:2px 2px 0 #17130F}
+button{font:400 13px var(--type);letter-spacing:.06em;cursor:pointer;border-radius:2px;
+  padding:7px 13px;border:2px solid #17130F;background:var(--paper);color:var(--ink);
+  box-shadow:2px 2px 0 #17130F;transition:.12s}
+button:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 #17130F}
+button:active{transform:translate(1px,1px);box-shadow:0 0 0 #17130F}
+button:focus-visible{outline:3px solid #E8B84B;outline-offset:1px}
+button.primary{background:var(--red);color:#FFF6E8;border-color:#5E140C;box-shadow:2px 2px 0 #5E140C}
+button.primary:hover{box-shadow:3px 3px 0 #5E140C}
+button.danger{background:#2A2622;color:#F0B4AB;border-color:#17130F}
+button:disabled{opacity:.45;cursor:default;transform:none}
+/* small utility button — Clear Log */
+.sm-btn{font:400 11px var(--type) !important;padding:2px 8px !important;letter-spacing:.06em;
+  border:1.5px solid #C7B58A !important;background:transparent !important;
+  color:var(--faded) !important;cursor:pointer;border-radius:2px;
+  box-shadow:none !important;margin-left:auto;transition:.12s}
+.sm-btn:hover{color:var(--ink) !important;border-color:#9A8A62 !important;
+  background:var(--paper2) !important;transform:none !important;box-shadow:none !important}
+
+/* ---------- boot: case file cover ---------- */
+#boot{position:fixed;inset:0;z-index:60;background:var(--wall);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;transition:opacity .6s}
+#boot.gone{opacity:0;pointer-events:none}
+#cover{width:min(640px,92vw);background:#C9A96B;border:1px solid #8F6C40;border-radius:4px;
+  padding:26px 30px;box-shadow:0 24px 60px rgba(0,0,0,.6), inset 0 0 60px rgba(120,80,30,.35);
+  transform:rotate(-.6deg)}
+#cover .tab{width:180px;height:22px;background:#C9A96B;border:1px solid #8F6C40;border-bottom:0;
+  border-radius:6px 6px 0 0;margin:-48px 0 24px 8px}
+#cover h1{font:400 26px var(--type);letter-spacing:.1em;color:#3A2E1C}
+#cover .sub{font:400 13px var(--type);color:#5C4A2E;margin-top:2px}
+#cover .stamp{float:right;font:700 15px var(--type);color:var(--redink);border:3px double var(--redink);
+  padding:4px 10px;transform:rotate(7deg);letter-spacing:.14em}
+#bootlog{margin-top:18px;background:var(--paper);border:1px solid #9C8256;height:200px;overflow:hidden;
+  padding:12px 16px;font:12.5px/1.85 var(--type);color:var(--faded);
+  box-shadow:inset 0 0 20px rgba(120,90,40,.18)}
+#bootlog .ok{color:#2F5FA8}#bootlog .ent{color:var(--ink)}#bootlog .warn{color:var(--redink)}
+
+/* ---------- shared paper card ---------- */
+.card{background:var(--paper);border:1px solid #B9A67E;border-radius:2px;
+  box-shadow:0 10px 26px rgba(20,10,4,.45), inset 0 0 34px rgba(140,110,60,.12);position:relative}
+.card::before{content:"";position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+  width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#E86A5C,#8E1F12);
+  box-shadow:0 3px 4px rgba(0,0,0,.5);z-index:2}
+h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color:var(--faded)}
+
+/* ---------- left rail: detective notes ---------- */
+#rail{position:fixed;z-index:30;left:14px;top:88px;bottom:52px;width:344px;display:flex;
+  flex-direction:column;gap:12px;pointer-events:none}
+#caselog{pointer-events:auto;flex:1;min-height:0;display:flex;flex-direction:column;transform:rotate(-.5deg)}
+#caselog .hd{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;border-bottom:2px solid var(--redink)}
+.live{width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1.4s infinite;flex-shrink:0}
+@keyframes blink{50%{opacity:.25}}
+#entries{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:9px;
+  background:repeating-linear-gradient(transparent 0 26px, rgba(160,40,24,.12) 26px 27px)}
+#entries::-webkit-scrollbar{width:7px}
+#entries::-webkit-scrollbar-thumb{background:#C7B68C;border-radius:3px}
+.entry{padding:7px 9px;font-size:12.5px;color:var(--ink);background:var(--paper2);
+  border:1px solid #D6C69C;box-shadow:2px 3px 6px rgba(60,40,10,.2);animation:pinin .3s ease;
+  border-left:4px solid var(--faded)}
+@keyframes pinin{from{transform:translateY(-6px) rotate(-1deg);opacity:0}}
+.entry b{font:400 11.5px var(--type);letter-spacing:.1em;display:block;margin-bottom:2px}
+.entry strong{font:600 12px var(--mono)}
+.entry.c-cyan{border-left-color:#2F5FA8}.entry.c-cyan b{color:#2F5FA8}
+.entry.c-amber{border-left-color:var(--amber)}.entry.c-amber b{color:var(--amber)}
+.entry.c-red{border-left-color:var(--red)}.entry.c-red b{color:var(--redink)}
+.entry.c-violet{border-left-color:var(--violet)}.entry.c-violet b{color:var(--violet)}
+.entry.c-blue{border-left-color:var(--blue)}.entry.c-blue b{color:var(--blue)}
+.entry.c-green{border-left-color:var(--green)}.entry.c-green b{color:var(--green)}
+.entry .src{display:block;margin-top:4px;font:10px var(--mono);color:var(--faded);
+  border-top:1px dashed #D6C69C;padding-top:3px}
+/* step progress bar */
+#stepdots{display:flex;gap:5px;justify-content:center;padding:5px 0 2px}
+#stepdots i{width:22px;height:4px;background:#D8C9A0;transition:.3s}
+#stepdots i.on{background:var(--red)}
+#stepcount{font:400 11px var(--mono);color:var(--faded);text-align:center;padding:0 0 5px;letter-spacing:.1em}
+#crackbar{display:flex;gap:8px;padding:0 10px 12px}
+#crackbar[hidden]{display:none}
+#crackbar button{flex:1;padding:7px 8px;font-size:12px}
+
+/* ---------- right panel: filters + legend + dossier ---------- */
+#intel{position:fixed;z-index:30;right:14px;top:88px;bottom:52px;width:330px;display:flex;
+  flex-direction:column;gap:10px;pointer-events:none}
+#filterCard{pointer-events:auto;transform:rotate(.6deg)}
+.filter-label{display:block;font:400 10px var(--type);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faded);padding:10px 14px 4px}
+#filters{display:flex;flex-wrap:wrap;gap:7px;padding:4px 14px 12px}
+.chip{font:400 12px var(--type);padding:4px 10px;border-radius:2px;border:1.5px solid var(--faded);
+  color:var(--faded);cursor:pointer;user-select:none;background:var(--paper2);transition:.12s}
+.chip.on{color:#FFF6E8;border-color:transparent}
+.chip[data-rel="calls"].on{background:var(--red)}
+.chip[data-rel="money"].on{background:var(--amber)}
+.chip[data-rel="co-accused"].on{background:var(--blue)}
+.chip[data-rel="jailed-together"].on{background:var(--violet)}
+
+/* ---------- legend card ---------- */
+#legendCard{pointer-events:auto;transform:rotate(.25deg)}
+.leg-inner{padding:9px 14px 11px}
+.leg-title{font:400 10px var(--type);letter-spacing:.16em;text-transform:uppercase;color:var(--faded);margin-bottom:7px}
+.leg-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 4px}
+.leg-row{display:flex;align-items:center;gap:6px;font:10.5px var(--mono);color:var(--faded);padding:3px 0}
+.leg-circle{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,.25)}
+.leg-sq{width:11px;height:9px;flex-shrink:0;border-radius:1px;border:1px solid rgba(0,0,0,.25)}
+.leg-line{width:20px;height:3px;flex-shrink:0;border-radius:2px}
+.leg-dash{width:20px;flex-shrink:0;border-top:3px dashed}
+
+/* ---------- dossier ---------- */
+#dossierCard{pointer-events:auto;flex:1;min-height:0;display:flex;flex-direction:column;
+  background:#D9B877;border-color:#A8874C;transform:rotate(-.4deg)}
+#dossierCard .hd{padding:10px 14px;border-bottom:2px solid #A8874C;display:flex;gap:8px;align-items:center}
+#dossierCard h3{color:#5C4A2E}
+#dossier{flex:1;min-height:0;overflow-y:auto;padding:14px;background:var(--paper);margin:10px;
+  border:1px solid #C9B586;box-shadow:inset 0 0 24px rgba(140,110,60,.14)}
+#dossier::-webkit-scrollbar{width:7px}
+#dossier::-webkit-scrollbar-thumb{background:#C7B68C}
+#dossier .empty{color:var(--faded);font-size:13px;line-height:1.9}
+#dossier .empty .how-h{font:700 18px var(--hand);color:var(--ink);margin-bottom:8px}
+#dossier .empty .how-step{margin-bottom:4px}
+#dossier .empty .how-step strong{font:500 12px var(--mono);color:var(--ink)}
+#dossier .empty .sources{margin-top:10px;padding-top:8px;border-top:1px dashed #C9B586;
+  font:10px var(--mono);color:var(--faded);line-height:1.7}
+.dname{font:700 30px var(--hand);color:var(--ink);line-height:1.1}
+.dkind{font:400 11px var(--type);letter-spacing:.16em;text-transform:uppercase;
+  display:inline-block;border:2px solid;padding:2px 8px;margin:8px 0 12px;transform:rotate(-2deg)}
+.metric{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px dashed #C9B586}
+.metric span{color:var(--faded)}.metric b{font:500 12px var(--mono);color:var(--ink)}
+.dossier-h{margin:14px 0 6px;font:400 12px var(--type);letter-spacing:.16em;color:var(--redink);
+  text-transform:uppercase;border-bottom:2px solid var(--redink);display:inline-block}
+.ev{font-size:12.5px;padding:7px 9px;background:var(--paper2);border:1px solid #D6C69C;
+  margin-bottom:7px;box-shadow:1px 2px 4px rgba(60,40,10,.18)}
+.ev b{font-family:var(--hand);font-size:16px}
+.ev span{font:10px var(--mono);color:var(--faded);display:block;margin-top:3px;
+  border-top:1px dashed #D6C69C;padding-top:2px}
+
+/* ---------- audit strip ---------- */
+#chain{position:fixed;z-index:35;left:0;right:0;bottom:0;height:36px;display:flex;align-items:center;
+  padding:0 14px;background:linear-gradient(#efe6cf,#e2d5b4);border-top:3px solid #17130F;
+  font:11px var(--mono);color:var(--faded);overflow:hidden}
+#chain .lbl{font:400 12px var(--type);letter-spacing:.12em;color:var(--ink);margin-right:12px;white-space:nowrap}
+#chain .lbl b{color:var(--green)} #chain.broken .lbl b{color:var(--redink)}
+#blocks{display:flex;align-items:center;flex:1;overflow:hidden}
+.blk{white-space:nowrap;border:1px solid #B9A67E;padding:2px 7px;color:var(--faded);
+  background:var(--paper);animation:pinin .3s}
+.blk i{color:var(--blue);font-style:normal}
+.blk.bad{border-color:var(--redink);color:var(--redink);background:#F6DCD6;animation:shake .4s}
+.lnk{color:#B9A67E;padding:0 3px}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+/* ---------- PRIME SUSPECT stamp ---------- */
+#lock{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;pointer-events:none}
+#lock.show{display:flex}
+#lock .frame{transform:rotate(-6deg);border:5px double var(--redink);padding:20px 40px;text-align:center;
+  color:var(--redink);background:rgba(245,239,224,.9);box-shadow:0 20px 50px rgba(0,0,0,.5);
+  animation:stampin .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes stampin{from{transform:rotate(-6deg) scale(2.2);opacity:0}}
+#lock .t{font:700 17px var(--type);letter-spacing:.4em}
+#lock .n{font:700 52px var(--hand);margin:2px 0;color:var(--ink)}
+#lock .d{font:11.5px var(--mono)}
+
+#toast{position:fixed;z-index:55;top:80px;left:50%;transform:translateX(-50%) rotate(-.8deg);
+  background:var(--paper);border:2px solid #17130F;box-shadow:3px 3px 0 #17130F;
+  padding:9px 18px;font:400 13px var(--type);letter-spacing:.06em;display:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:1100px){#intel{display:none}#rail{width:300px}}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div id="cover">
+    <div class="tab"></div>
+    <span class="stamp">CONFIDENTIAL</span>
+    <h1>CASE FILE &middot; OP-SANGAM</h1>
+    <div class="sub">PRAHARI &mdash; AI Criminal Network Analysis &middot; NCRB / Ministry of Home Affairs &middot; SIH 26189</div>
+    <div id="bootlog"></div>
+  </div>
+</div>
+
+<header>
+  <div class="brand"><b>PRAHARI</b><span>SIH 26189</span></div>
+  <div class="case">CASE <i>OP-SANGAM</i> &middot; DELHI&ndash;MUMBAI</div>
+  <span id="statline">Loading intelligence&hellip;</span>
+  <input id="search" placeholder="Search person ( press / )" aria-label="Search entity">
+  <button class="primary" id="crackBtn" onclick="startCrack()"
+    title="6-step guided AI investigation: gang clusters &rarr; broker &rarr; money trail &rarr; kingpin &rarr; jail origin &rarr; anomaly spike">
+    &#x2A35; Crack the Case
+  </button>
+  <button class="danger" onclick="tamperDemo()"
+    title="Demo: simulates a rogue admin editing a past audit record &mdash; SHA-256 blockchain catches it instantly">
+    &#x1F512; Tamper Test
+  </button>
+</header>
+
+<div class="lamp" id="lampA"></div><div class="lamp" id="lampB"></div>
+<div id="graph" role="application" aria-label="Evidence board"></div>
+
+<!-- ===== LEFT: Detective's Notes ===== -->
+<div id="rail">
+  <div class="card" id="caselog">
+    <div class="hd">
+      <span class="live"></span>
+      <h3>Detective&rsquo;s Notes &mdash; AI</h3>
+      <button class="sm-btn" onclick="clearLog()" title="Clear log and reset for a fresh demo run">&#x232B; Clear</button>
+    </div>
+    <div id="entries"></div>
+    <div id="stepdots"></div>
+    <div id="stepcount" hidden></div>
+    <div id="crackbar" hidden>
+      <button onclick="prevStep()" id="prevBtn" title="Go back one step">&#9664; Back</button>
+      <button class="primary" onclick="nextStep()" id="nextBtn" title="Advance to next finding">Next &#9654;</button>
+      <button onclick="endCrack()" title="Exit walkthrough and show full investigator brief">&#x2715; Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RIGHT: Filters + Legend + Dossier ===== -->
+<div id="intel">
+
+  <!-- Filter chips -->
+  <div class="card" id="filterCard">
+    <span class="filter-label">Show connection types on board</span>
+    <div id="filters">
+      <span class="chip on" data-rel="calls"          title="Phone call records (CDR)">&#128222; Calls</span>
+      <span class="chip on" data-rel="money"          title="Bank transfer records (FIU-IND)">&#128176; Money</span>
+      <span class="chip on" data-rel="co-accused"     title="Named together in same FIR (CCTNS)">&#9878; Co-accused</span>
+      <span class="chip on" data-rel="jailed-together" title="Shared a cell block (e-Prisons)">&#128279; Jail link</span>
+    </div>
+  </div>
+
+  <!-- Board legend -->
+  <div class="card" id="legendCard">
+    <div class="leg-inner">
+      <div class="leg-title">Board Legend</div>
+      <div class="leg-grid">
+        <div class="leg-row"><div class="leg-circle" style="background:#5A5A5A"></div>Person / suspect</div>
+        <div class="leg-row"><div class="leg-circle" style="background:#F7E27A;border-color:#8A7A1E"></div>Burner phone</div>
+        <div class="leg-row"><div class="leg-sq" style="background:#D9B877;border-color:#A8874C"></div>Shell company</div>
+        <div class="leg-row"><div class="leg-circle" style="background:#A02818"></div>Prime suspect</div>
+        <div class="leg-row"><div class="leg-line" style="background:#C0392B"></div>Calls (CDR)</div>
+        <div class="leg-row"><div class="leg-line" style="background:#B87E1F"></div>Money (FIU)</div>
+        <div class="leg-row"><div class="leg-line" style="background:#2F5FA8"></div>Co-accused (FIR)</div>
+        <div class="leg-row"><div class="leg-dash" style="border-color:#7C5CBF"></div>Jail link</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entity dossier -->
+  <div class="card" id="dossierCard">
+    <div class="hd"><h3>&#128193; Case File &mdash; Entity Profile</h3></div>
+    <div id="dossier">
+      <div class="empty">
+        <div class="how-h">How to use this board</div>
+        <div class="how-step">&#9312; <strong>Click any photo</strong> on the board to open their criminal profile here</div>
+        <div class="how-step">&#9313; <strong>Filter chips</strong> above toggle which connection types are visible</div>
+        <div class="how-step">&#9314; <strong>&#x2A35; Crack the Case</strong> &mdash; 6-step guided AI investigation walkthrough</div>
+        <div class="how-step">&#9315; <strong>&#x1F512; Tamper Test</strong> &mdash; live blockchain audit integrity demo</div>
+        <div class="how-step">&#9316; <strong>Search ( press / )</strong> &mdash; instantly fly the camera to any person</div>
+        <div class="sources">
+          Data sources ingested:<br>
+          CCTNS (FIRs) &middot; CDR (call records) &middot; FIU-IND (bank) &middot; e-Prisons &middot; VAHAN (vehicles)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Blockchain audit strip -->
+<div id="chain">
+  <span class="lbl">BLOCKCHAIN AUDIT LOG <b id="chainState">&#9679; SEALED</b></span>
+  <div id="blocks"></div>
+</div>
+
+<!-- Prime suspect stamp overlay -->
+<div id="lock"><div class="frame">
+  <div class="t">&#9733; PRIME SUSPECT &#9733;</div>
+  <div class="n" id="lockName"></div>
+  <div class="d" id="lockDetail"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+/* ================= state ================= */
+const C={red:"#C0392B",redink:"#A02818",amber:"#B87E1F",violet:"#7C5CBF",
+         blue:"#2F5FA8",green:"#2F7D4F",faded:"#6E6353",ink:"#2B2620"};
+let DATA=null,network=null,nodesDS=null,edgesDS=null,roles={},META={},DIM=null;
+let crack={on:false,step:-1};
+const $=id=>document.getElementById(id);
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const anim=reduceMotion?false:{duration:900,easingFunction:"easeInOutQuad"};
+const rand=s=>{let x=Math.sin(s*9973)*10000;return x-Math.floor(x);};
+
+/* ================= boot ================= */
+async function boot(){
+  const log=$("bootlog");
+  const say=(t,c="")=>{log.innerHTML+=`<div class="${c}">${t}</div>`;log.scrollTop=1e9;};
+  say("PRAHARI v3 \u2014 case file opened","ok");
+  say("Connecting to: CCTNS \u00b7 CDR \u00b7 FIU-IND \u00b7 e-Prisons \u00b7 VAHAN \u2026");
+  const t0=performance.now();
+  const r=await fetch(`/api/graph?officer=Officer-${100+Math.floor(Math.random()*9)}`);
+  DATA=await r.json();
+  const ms=Math.round(performance.now()-t0);
+  say(`\u2714  Parsed ${DATA.stats.firs_parsed} FIRs across Delhi &amp; Mumbai police districts`,"ok");
+  say(`\u2714  Cross-linked CDR \u00b7 bank transactions \u00b7 prison rosters \u00b7 travel manifests`,"ok");
+  for(const n of DATA.nodes.filter(x=>x.kind!=="person").slice(0,3))
+    say(`\u26a0  Unresolved entity: ${n.id} [${n.kind.replace("_"," ")}]`,"warn");
+  say(`\u2714  ${DATA.stats.people} suspects identified \u2014 printing photographs to board`,"ent");
+  say(`\u2714  Stringing connections: ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} gang clusters`,"ok");
+  say(`\u2714  AI analysis complete in ${ms}\u202fms \u2014 board is live`,"ent");
+  deriveRoles(); buildMeta();
+  try{await document.fonts.ready;}catch(e){}
+  buildGraph(); baseLog(); loadAudit();
+  /* populate live stats bar */
+  $("statline").textContent=
+    `${DATA.stats.people} suspects \u00b7 ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} clusters \u00b7 ${DATA.stats.firs_parsed} FIRs`;
+  setTimeout(()=>$("boot").classList.add("gone"),reduceMotion?100:1100);
+}
+
+/* ================= roles (derived live \u2014 nothing hardcoded) ================= */
+function deriveRoles(){
+  const persons=DATA.nodes.filter(n=>n.kind==="person");
+  roles.burner=(DATA.nodes.find(n=>n.kind==="burner_phone")||{}).id;
+  roles.shell=(DATA.nodes.find(n=>n.kind==="shell_company")||{}).id;
+  const shellEdges=DATA.edges.filter(e=>e.money_inr&&(e.from===roles.shell||e.to===roles.shell));
+  const kp=shellEdges.map(e=>e.from===roles.shell?e.to:e.from)
+    .map(id=>DATA.nodes.find(n=>n.id===id)).filter(n=>n&&n.kind==="person")
+    .sort((a,b)=>b.betweenness-a.betweenness)[0];  /* highest betweenness = most central node */
+  roles.kingpin=kp?kp.id:null;
+  const byComm={};
+  persons.filter(p=>p.id!==roles.kingpin).forEach(p=>{
+    if(!byComm[p.community]||p.pagerank>byComm[p.community].pagerank)byComm[p.community]=p;});
+  roles.leaders=Object.values(byComm).sort((a,b)=>b.pagerank-a.pagerank).slice(0,2).map(p=>p.id);
+  roles.gangComms=roles.leaders.map(id=>DATA.nodes.find(n=>n.id===id).community);
+  roles.jailEdge=DATA.edges.find(e=>e.rel==="jailed-together"&&
+    roles.leaders.includes(e.from)&&roles.leaders.includes(e.to));
+}
+function buildMeta(){
+  DATA.nodes.forEach((n,i)=>{META[n.id]={...n,seed:i+1,
+    prime:n.id===roles.kingpin,
+    leader:roles.leaders.includes(n.id),
+    gang:roles.gangComms.indexOf(n.community)};});
+}
+
+/* ================= polaroid / sticky / evidence-tag renderers ================= */
+function drawPin(ctx,x,y,color){
+  ctx.save();
+  ctx.beginPath();ctx.arc(x,y,5.5,0,7);
+  const g=ctx.createRadialGradient(x-2,y-2,1,x,y,6);
+  g.addColorStop(0,"#F08A7C");g.addColorStop(1,color);
+  ctx.fillStyle=g;ctx.shadowColor="rgba(0,0,0,.45)";ctx.shadowBlur=4;ctx.shadowOffsetY=2;ctx.fill();
+  ctx.restore();
+}
+function silhouette(ctx,x,y,w,h,seed,prime){
+  const g=ctx.createLinearGradient(x,y,x,y+h);
+  g.addColorStop(0,"#8C8C8C");g.addColorStop(1,"#5E5E5E");
+  ctx.fillStyle=g;ctx.fillRect(x,y,w,h);
+  const cx=x+w/2, r=h*.19*(0.9+rand(seed)*.25);
+  ctx.fillStyle=prime?"#3A2A28":"#33383E";
+  ctx.beginPath();ctx.arc(cx,y+h*.38,r,0,7);ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx,y+h*.92,w*.34,h*.34,0,Math.PI,2*Math.PI);ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.05)";
+  for(let i=0;i<14;i++)ctx.fillRect(x+rand(seed*7+i)*w,y+rand(seed*13+i)*h,1.5,1.5);
+  if(prime){
+    ctx.fillStyle="rgba(192,57,43,.9)";ctx.font="700 26px 'Special Elite',monospace";
+    ctx.textAlign="center";ctx.fillText("?",cx,y+h*.47);}
+}
+function markerRing(ctx,x,y,rx,ry){
+  ctx.save();ctx.strokeStyle="rgba(192,57,43,.95)";ctx.lineWidth=3;ctx.lineCap="round";
+  ctx.beginPath();
+  for(let a=0;a<=Math.PI*2.15;a+=.22){
+    const wob=1+Math.sin(a*3.7)*.045;
+    const px=x+Math.cos(a)*rx*wob, py=y+Math.sin(a)*ry*wob;
+    a===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+  ctx.stroke();ctx.restore();
+}
+function rendererFor(id){
+  const m=META[id];
+  return ({ctx,x,y,state})=>{
+    const dim=DIM&&!DIM.has(id);
+    const rot=(rand(m.seed)-.5)*.14;
+    const sel=state.selected||state.hover;
+    let w,h;
+    return {
+      drawNode(){
+        ctx.save();ctx.translate(x,y);ctx.rotate(rot);
+        ctx.globalAlpha=dim?.22:1;
+        ctx.shadowColor="rgba(20,10,4,.5)";ctx.shadowBlur=10;ctx.shadowOffsetY=5;
+        if(m.kind==="burner_phone"){
+          w=104;h=78;
+          ctx.fillStyle="#F7E27A";ctx.fillRect(-w/2,-h/2,w,h);
+          ctx.shadowColor="transparent";
+          ctx.fillStyle="#8A7A1E";ctx.font="400 10px 'Special Elite',monospace";
+          ctx.textAlign="center";ctx.fillText("burner?",0,-h/2+16);
+          ctx.fillStyle="#2B2620";ctx.font="700 13px 'IBM Plex Mono',monospace";
+          ctx.fillText(m.id,0,2);
+          ctx.strokeStyle="#C0392B";ctx.lineWidth=2;
+          ctx.beginPath();ctx.moveTo(-w/2+10,12);ctx.lineTo(w/2-10,14);ctx.stroke();
+          ctx.fillStyle="#8A7A1E";ctx.font="400 9px 'Special Elite',monospace";
+          ctx.fillText("no subscriber",0,h/2-12);
+          drawPin(ctx,0,-h/2+4,"#8E1F12");
+        }else if(m.kind==="shell_company"){
+          w=120;h=58;
+          ctx.fillStyle="#D9B877";
+          ctx.beginPath();ctx.moveTo(-w/2+14,-h/2);ctx.lineTo(w/2,-h/2);ctx.lineTo(w/2,h/2);
+          ctx.lineTo(-w/2+14,h/2);ctx.lineTo(-w/2,0);ctx.closePath();ctx.fill();
+          ctx.shadowColor="transparent";
+          ctx.strokeStyle="#A8874C";ctx.lineWidth=1.5;ctx.stroke();
+          ctx.fillStyle="#F5EFE0";ctx.beginPath();ctx.arc(-w/2+12,0,4,0,7);ctx.fill();ctx.stroke();
+          ctx.fillStyle="#5C4A2E";ctx.font="400 9px 'Special Elite',monospace";
+          ctx.textAlign="center";ctx.fillText("EVIDENCE \u00b7 SHELL CO.",8,-8);
+          ctx.fillStyle="#2B2620";ctx.font="700 14px 'Caveat',cursive";
+          const nm=m.id.length>20?m.id.slice(0,19)+"\u2026":m.id;
+          ctx.fillText(nm,8,10);
+          drawPin(ctx,8,-h/2+4,"#8E1F12");
+        }else{
+          w=84;h=104;
+          ctx.fillStyle="#FAF7EE";ctx.fillRect(-w/2,-h/2,w,h);
+          ctx.shadowColor="transparent";
+          silhouette(ctx,-w/2+7,-h/2+7,w-14,h-36,m.seed,m.prime);
+          ctx.fillStyle="#2B2620";ctx.font="700 15px 'Caveat',cursive";ctx.textAlign="center";
+          const nm=m.label.length>13?m.label.split(" ")[0]:m.label;
+          ctx.fillText(nm,0,h/2-(m.leader?17:9));
+          if(m.leader){ctx.fillStyle=m.gang===0?"#2F5FA8":"#2F7D4F";
+            ctx.font="400 8.5px 'Special Elite',monospace";
+            ctx.fillText(m.gang===0?"CELL A \u2014 LEADER":"CELL B \u2014 LEADER",0,h/2-6);}
+          if(m.prime&&!dim){
+            ctx.save();ctx.rotate(-.18);ctx.strokeStyle="rgba(160,40,24,.9)";ctx.lineWidth=2;
+            ctx.strokeRect(-34,-14,68,22);
+            ctx.fillStyle="rgba(160,40,24,.9)";ctx.font="700 11px 'Special Elite',monospace";
+            ctx.fillText("PRIME SUSPECT",0,2);ctx.restore();}
+          drawPin(ctx,0,-h/2+4,m.gang===0?"#2F5FA8":m.gang===1?"#2F7D4F":"#8E1F12");
+        }
+        if(sel&&!dim)markerRing(ctx,0,0,w/2+10,h/2+8);
+        ctx.restore();
+        return {nodeDimensions:{width:w,height:h}};
+      },
+      nodeDimensions:{width:w||90,height:h||100},
+    };
+  };
+}
+
+/* ================= edge styles ================= */
+function edgeStyle(e){
+  const col=e.rel==="money"?C.amber:e.rel==="jailed-together"?C.violet
+        :e.rel==="co-accused"?"#7A4A3A":C.red;
+  return {color:{color:col,highlight:C.redink,opacity:.9},
+    width:e.money_inr?3:e.calls?Math.min(1.4+e.calls/5,3.2):1.6,
+    dashes:e.rel==="jailed-together"?[7,7]:false,
+    smooth:{type:"continuous",roundness:.18},
+    shadow:{enabled:true,color:"rgba(40,15,5,.35)",size:3,y:2}};
+}
+
+/* ================= build board ================= */
+function buildGraph(){
+  nodesDS=new vis.DataSet(DATA.nodes.map(n=>({id:n.id,shape:"custom",
+    ctxRenderer:rendererFor(n.id)})));
+  edgesDS=new vis.DataSet(DATA.edges.map((e,i)=>({id:"e"+i,from:e.from,to:e.to,
+    ...edgeStyle(e),_rel:e.rel,_money:e.money_inr,_calls:e.calls,_src:e.source})));
+  network=new vis.Network($("graph"),{nodes:nodesDS,edges:edgesDS},{
+    physics:{barnesHut:{gravitationalConstant:-9000,springLength:190,springConstant:.02,
+      avoidOverlap:.6},stabilization:{iterations:260}},
+    interaction:{hover:true,tooltipDelay:120}});
+  network.once("stabilizationIterationsDone",()=>network.setOptions({physics:false}));
+  network.on("click",p=>{if(p.nodes.length)openDossier(p.nodes[0]);});
+}
+
+/* ================= entity dossier ================= */
+/* human-readable labels for each relationship type */
+const REL_LABEL={
+  "calls":          "Phone calls \u2014 CDR record",
+  "money":          "Money transfer \u2014 FIU-IND",
+  "co-accused":     "Co-accused in same FIR",
+  "jailed-together":"Shared prison cell block",
+  "phone-linked":   "Shared phone contact",
+};
+function openDossier(id){
+  const n=DATA.nodes.find(x=>x.id===id);if(!n)return;
+  const ev=DATA.edges.filter(e=>e.from===id||e.to===id);
+  const col=n.kind==="burner_phone"?C.redink:n.kind==="shell_company"?C.amber:
+            id===roles.kingpin?C.redink:C.blue;
+  const lbl=id===roles.kingpin?"\u2605 PRIME SUSPECT":n.kind.replace(/_/g," ").toUpperCase();
+  $("dossier").innerHTML=`
+    <div class="dname">${n.label}</div>
+    <span class="dkind" style="color:${col};border-color:${col}">${lbl}</span>
+    <div class="metric"><span>PageRank \u2014 influence score</span><b>${n.pagerank}</b></div>
+    <div class="metric"><span>Betweenness \u2014 broker score</span><b>${n.betweenness}</b></div>
+    <div class="metric"><span>Gang / cluster</span><b>#${n.community}</b></div>
+    <div class="metric"><span>Evidence links on board</span><b>${ev.length}</b></div>
+    <div class="dossier-h">Evidence on the board</div>
+    ${ev.map(e=>{
+      const other=e.from===id?e.to:e.from;
+      const what=e.money_inr
+        ?`\u20b9${(+e.money_inr).toLocaleString("en-IN")} transferred`
+        :e.calls
+        ?`${e.calls} phone calls recorded`
+        :(REL_LABEL[e.rel]||e.rel);
+      const src=e.source?`source: ${e.source}`:(REL_LABEL[e.rel]||e.rel);
+      return `<div class="ev"><b>${other}</b> \u2014 ${what}<span>${src}</span></div>`;
+    }).join("")}`;
+}
+
+/* ================= filters & search ================= */
+document.querySelectorAll(".chip").forEach(ch=>ch.onclick=()=>{ch.classList.toggle("on");applyFilters();});
+function applyFilters(){
+  const on=[...document.querySelectorAll(".chip.on")].map(c=>c.dataset.rel);
+  edgesDS.forEach(e=>edgesDS.update({id:e.id,hidden:!on.includes(e._rel)&&!!e._rel}));
+}
+$("search").addEventListener("keydown",ev=>{
+  if(ev.key!=="Enter")return;
+  const q=$("search").value.toLowerCase();
+  const hit=DATA.nodes.find(n=>n.id.toLowerCase().includes(q));
+  if(hit){network.focus(hit.id,{scale:1.15,animation:anim});
+    network.selectNodes([hit.id]);openDossier(hit.id);}
+});
+addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement!==$("search")){
+  e.preventDefault();$("search").focus();}});
+
+/* ================= detective notes ================= */
+function logEntry(tag,color,text,src){
+  const d=document.createElement("div");d.className=`entry c-${color}`;
+  d.style.transform=`rotate(${(Math.random()-.5)*1.2}deg)`;
+  d.innerHTML=`<b>${tag}</b>${text}${src?`<span class="src">\ud83d\udcce ${src}</span>`:""}`;
+  $("entries").appendChild(d);$("entries").scrollTop=1e9;return d;
+}
+function baseLog(){
+  logEntry("BOARD READY","cyan",
+    `${DATA.stats.people} photographs pinned \u00b7 ${DATA.stats.edges} strings attached \u00b7 `+
+    `${DATA.stats.communities} gang clusters found. `+
+    `Press <b style="font-family:inherit;letter-spacing:.06em">\u2a35 Crack the Case</b> to walk the board step by step.`);
+}
+function clearLog(){
+  $("entries").innerHTML="";
+  logEntry("LOG CLEARED","cyan","Board reset \u2014 ready for a fresh demonstration run.");
+}
+
+/* ================= dim / focus ================= */
+function dimExcept(keep){DIM=new Set(keep);
+  edgesDS.forEach(e=>edgesDS.update({id:e.id,
+    color:{...e.color,opacity:(DIM.has(e.from)&&DIM.has(e.to))?.95:.08}}));
+  network.redraw();}
+function undim(){DIM=null;
+  edgesDS.forEach(e=>{const b=edgeStyle({rel:e._rel,money_inr:e._money,calls:e._calls});
+    edgesDS.update({id:e.id,color:b.color});});
+  network.unselectAll();network.redraw();}
+function focusOn(ids){network.fit({nodes:ids,animation:anim});
+  network.selectNodes(ids.filter(id=>nodesDS.get(id)));}
+function members(comm){return DATA.nodes.filter(n=>n.community===comm&&n.kind==="person").map(n=>n.id);}
+
+/* ================= CRACK THE CASE \u2014 6-step guided walkthrough ================= */
+const steps=()=>[
+ {tag:"STEP 1 \u00b7 TWO CELLS",color:"blue",
+  text:`Grouping the photographs: two organised crime cells emerge from the noise \u2014 `+
+       `Cell A around <strong>${roles.leaders[0]}</strong>, `+
+       `Cell B around <strong>${roles.leaders[1]}</strong>.`,
+  src:"algorithm: Louvain community detection",
+  act(){const ids=[...members(roles.gangComms[0]),...members(roles.gangComms[1])];
+    dimExcept(ids);focusOn(ids);}},
+ {tag:"STEP 2 \u00b7 THE BROKER",color:"red",
+  text:`The yellow sticky: unregistered burner <strong>${roles.burner}</strong> calls leaders `+
+       `of BOTH cells. No subscriber identity \u2014 highest cross-cell traffic on the board.`,
+  src:`evidence: CDR \u2014 device ${roles.burner}`,
+  act(){const ids=[roles.burner,...roles.leaders];dimExcept(ids);focusOn(ids);}},
+ {tag:"STEP 3 \u00b7 FOLLOW THE MONEY",color:"amber",
+  text:`Both leaders wire funds to the same shell company \u2014 `+
+       `<strong>${roles.shell}</strong>. `+
+       `Many sources in, one consolidated payout out: textbook money layering.`,
+  src:"evidence: FIU-IND transaction records",
+  act(){const ids=[roles.shell,...roles.leaders,roles.kingpin];dimExcept(ids);focusOn(ids);}},
+ {tag:"STEP 4 \u00b7 PRIME SUSPECT",color:"red",
+  text:`Money exits to <strong>${roles.kingpin}</strong> \u2014 a face on the board named in `+
+       `<strong>ZERO FIRs</strong>. Financially central, operationally invisible. `+
+       `PRAHARI stamps him PRIME SUSPECT.`,
+  src:"heuristic: money-in \u2191 \u00b7 FIR mentions = 0",
+  act(){dimExcept([roles.kingpin,roles.shell]);focusOn([roles.kingpin]);
+    $("lockName").textContent=roles.kingpin;
+    $("lockDetail").textContent="net inflow \u20b97,00,000 \u00b7 FIR mentions: 0 \u00b7 via "+roles.shell;
+    $("lock").classList.add("show");
+    setTimeout(()=>$("lock").classList.remove("show"),reduceMotion?600:2600);}},
+ {tag:"STEP 5 \u00b7 WHERE IT BEGAN",color:"violet",
+  text:`Dashed purple string: both cell leaders overlapped at `+
+       `<strong>${roles.jailEdge?roles.jailEdge.source:"the same cell block"}</strong> in 2022. `+
+       `The criminal alliance was forged inside prison.`,
+  src:"evidence: e-Prisons inmate roster",
+  act(){dimExcept(roles.leaders);focusOn(roles.leaders);}},
+ {tag:"STEP 6 \u00b7 THE TELL",color:"cyan",
+  text:DATA&&DATA.anomalies.length
+    ?`Burst detection: <strong>${DATA.anomalies[0].pair}</strong> spiked to `+
+     `<strong>${DATA.anomalies[0].calls_that_day} calls</strong> on ${DATA.anomalies[0].date} \u2014 `+
+     `48 hours before the Mundra seizure. In production this fires a real-time alert.`
+    :"No call-burst anomalies detected in the current window.",
+  src:"algorithm: per-pair burst detection",
+  act(){const ids=[roles.burner,...roles.leaders];dimExcept(ids);focusOn(ids);}},
+];
+
+function startCrack(){
+  if(!DATA)return;
+  crack.on=true;crack.step=-1;
+  $("crackbar").hidden=false;$("crackBtn").disabled=true;
+  $("stepcount").hidden=false;
+  $("entries").innerHTML="";
+  $("stepdots").innerHTML=steps().map(()=>"<i></i>").join("");
+  logEntry("WALKING THE BOARD","cyan",
+    "Guided AI investigation started \u2014 every finding below is computed live from the pinned records.");
+  nextStep();
+}
+function renderStep(){
+  const S=steps(),i=crack.step;
+  [...$("stepdots").children].forEach((d,k)=>d.classList.toggle("on",k<=i));
+  $("stepcount").textContent=`Step ${i+1} of ${S.length}`;
+  $("prevBtn").disabled=i<=0;
+  $("nextBtn").textContent=i>=S.length-1?"Done \u2713":"Next \u25b6";
+  const s=S[i];logEntry(s.tag,s.color,s.text,s.src);s.act();
+}
+function nextStep(){
+  const S=steps();
+  if(crack.step>=S.length-1){endCrack();return;}
+  crack.step++;renderStep();
+}
+function prevStep(){
+  if(crack.step<=0)return;
+  $("entries").lastChild?.remove();  /* remove current step entry BEFORE decrementing */
+  crack.step--;renderStep();
+}
+function endCrack(){
+  crack.on=false;$("crackbar").hidden=true;$("crackBtn").disabled=false;
+  $("stepcount").hidden=true;
+  undim();network.fit({animation:anim});
+  logEntry("CASE BRIEF","green","Full AI investigator brief generated:");
+  DATA.insights.forEach(t=>{const[h,...r]=t.split(" \u2014 ");logEntry(h,"cyan",r.join(" \u2014 "));});
+}
+
+/* ================= blockchain audit chain ================= */
+async function loadAudit(){
+  const d=await (await fetch("/api/audit")).json();
+  $("chain").classList.toggle("broken",!d.chain_valid);
+  $("chainState").textContent=d.chain_valid?"\u25cf SEALED":"\u2715 BROKEN @ block "+d.tampered_block;
+  $("blocks").innerHTML=d.blocks.slice(-6).map(b=>
+    `<span class="blk">#${b.index} ${b.officer} <i>${b.hash.slice(0,10)}</i></span>`)
+    .join(`<span class="lnk">\u2500\u2500</span>`);
+}
+async function tamperDemo(){
+  /* remove any previously stacked audit alert entries so the log stays clean on repeat runs */
+  [...$("entries").querySelectorAll(".c-red")].forEach(e=>e.remove());
+  const d=await (await fetch("/api/audit/tamper-demo")).json();
+  const blocks=$("blocks").children;
+  if(blocks.length)blocks[0].classList.add("bad");
+  $("chain").classList.add("broken");
+  $("chainState").textContent="\u2715 BROKEN @ block "+d.first_broken_block;
+  toast("\u26a0 ROGUE EDIT DETECTED \u2014 HASH CHAIN BROKEN AT BLOCK "+d.first_broken_block);
+  logEntry("AUDIT ALERT","red",
+    `A past query record was silently altered. SHA-256 chain verification failed at `+
+    `block <strong>${d.first_broken_block}</strong> \u2014 every later seal is now invalid. `+
+    `Tampering cannot be hidden in this system.`,
+    "source: SHA-256 blockchain evidence log");
+  setTimeout(()=>{toast("\u2714 RECORD RESTORED \u2014 LOG SEALED AGAIN");loadAudit();},reduceMotion?800:3000);
+}
+function toast(msg){
+  const t=$("toast");t.textContent=msg;
+  t.style.display="block";clearTimeout(t._h);
+  t._h=setTimeout(()=>t.style.display="none",2800);
+}
+
+boot();
+</script>
+</body>
+</html>
