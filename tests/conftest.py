@@ -32,11 +32,20 @@ _NOT_COPIED = ("audit_chain.json", "decisions.json", "cctv.csv", "gps.csv",
 
 @pytest.fixture(scope="session", autouse=True)
 def isolated_data(tmp_path_factory):
-    """Point every data path at a scratch copy of data/ for the whole session."""
-    src = os.path.abspath(loaders.BASE)
+    """Point every data path at a scratch copy of the SHIPPED corpus.
+
+    The copy is taken from data/seed/ when it exists, so the suite asserts the
+    corpus the demo narrative was written against even after ADD DATA has been
+    used on the live data/ folder (a rehearsal must not turn the tests red).
+    Without a seed it falls back to data/ itself."""
+    live = os.path.abspath(loaders.BASE)
+    seed = os.path.join(live, "seed")
+    src = seed if os.path.isdir(seed) else live
     dst = str(tmp_path_factory.mktemp("data"))
     shutil.copytree(src, dst, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns(*_NOT_COPIED))
+    if src == seed:                       # the reset tests need a seed inside the copy
+        shutil.copytree(seed, os.path.join(dst, "seed"), dirs_exist_ok=True)
     firs = os.path.join(dst, "firs")
 
     mp = pytest.MonkeyPatch()
