@@ -1,117 +1,137 @@
-# 🏆 SIH 26189 — AI-Powered Criminal Network Analysis System
+# SIH 26189 — PRAHARI
+## Investigative Intelligence & Evidence Correlation Platform
 ### Ministry of Home Affairs · NCRB · Theme: Blockchain & Cybersecurity
 
-**READ THIS FILE FIRST. Total setup time: ~5 minutes.**
+**Read this file first. Setup takes about five minutes.**
 
 ---
 
-## 📦 What's in this package
+## What's in this package
 
 ```
 sih-package/
-├── README_START_HERE.md        ← you are here
-├── requirements.txt            ← python dependencies
+├── README_START_HERE.md         ← you are here
+├── README.md                    ← comprehensive reference (data schemas, API, algorithms)
+├── requirements.txt             ← Python dependencies
 ├── backend/
-│   ├── generate_data.py        ← creates all synthetic datasets (already run once)
-│   ├── engine.py               ← NER + graph + analytics + audit blockchain
-│   └── main.py                 ← FastAPI server
+│   ├── config.py                ← every threshold, weight and notice, in one file
+│   ├── pipeline.py              ← orchestration + fingerprint-keyed caching
+│   ├── main.py                  ← FastAPI app
+│   ├── engine.py                ← compatibility shim / terminal self-test
+│   ├── reset_demo_data.py       ← restore data/ to the shipped corpus
+│   ├── ingestion/               ← loaders (stable ids) + the ADD DATA intake pipeline
+│   ├── evidence/                ← provenance ledger + confidence model
+│   ├── graph/                   ← temporal graph, windows, timeline
+│   ├── entity_resolution/       ← candidate identity matching (never auto-merged)
+│   ├── analytics/               ← centrality, clusters, Investigative Lead Score
+│   ├── anomaly/                 ← 10 configurable detectors
+│   ├── assistant/               ← grounded question answering over the records
+│   ├── cases/                   ← investigator decisions store
+│   ├── audit/                   ← SHA-256 hash chain
+│   └── api/                     ← HTTP routes
 ├── frontend/
-│   └── index.html              ← interactive graph dashboard (vis-network)
-├── data/                       ← 21 synthetic FIRs, CDR/bank/prison/travel/vehicle CSVs
-├── ppt/
-│   └── SIH_Idea_Submission.pptx ← your idea-submission deck
+│   ├── app.html + dashboard.js  ← the dashboard (default at /)
+│   ├── index.html               ← the original corkboard (at /classic)
+│   └── vendor/vis-network.min.js← graph library, vendored — no CDN needed
+├── data/                        ← 21 FIRs + CSVs; data/seed/ is the pristine copy
+├── tests/                       ← 182 tests, run against a temporary copy of data/
 └── docs/
-    ├── DEMO_SCRIPT_6_MEMBERS.md ← who says what, line by line
-    ├── ARCHITECTURE.md          ← system design + production upgrade path
+    ├── PHASE1.md                ← what Phase 1 changed and why
+    ├── DEMO_SCRIPT_6_MEMBERS.md ← who says what, with the driver's cue sheet
+    ├── ARCHITECTURE.md          ← pipeline, guarantees, production path
     └── JUDGE_QA.md              ← 20 likely judge questions with answers
 ```
 
-## 🚀 Setup (do this once, on the laptop)
+## Setup (once, on the demo laptop)
 
-1. **Unzip** this folder anywhere (e.g. Desktop). Open a terminal **inside** the
-   `sih-package` folder.
-2. **Install Python 3.10+** if not present → https://python.org (tick "Add to PATH" on Windows).
+1. Open a terminal **inside** the `sih-package` folder.
+2. Install Python 3.10+ if needed (tick "Add to PATH" on Windows).
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 4. Run the server:
    ```bash
-   uvicorn backend.main:app --reload
+   python -m uvicorn backend.main:app
    ```
-   (Windows alternative if uvicorn isn't found: `python -m uvicorn backend.main:app --reload`)
-5. Open **http://localhost:8000** in Chrome. Watch the boot sequence, then hit
-   **⦿ Crack the Case**. Done. 🎉
+5. Open **http://localhost:8000** in Chrome.
 
-> Internet is needed the first time the page loads (graph library + fonts from
-> CDN). At the venue, load the page once on hotel WiFi and keep the tab open,
-> or download vis-network.min.js into `frontend/` and change the `<script src>`
-> line to point at it — then it's fully offline.
+Only Google Fonts come from the internet; without them the board still works.
 
-## 🎛 The PRAHARI Evidence Board — what each control does
+### Run the tests
 
-The UI is a detective's corkboard under spotlights: every person is a **pinned
-polaroid** (leaders labelled CELL A/B — LEADER), the burner phone is a **yellow
-sticky note**, the shell company a **manila evidence tag**, and every
-relationship is **string** — red for calls, amber twine for money, dashed
-purple for shared jail time. Panels are a detective's notepad (left) and a
-manila case file (right).
-
-- **Boot sequence** — a CONFIDENTIAL case-file cover opens with a live typewriter
-  ingestion log, then the board is revealed. Let judges watch it.
-- **⦿ Crack the Case** — THE demo feature. A guided 6-step cinematic
-  investigation: gangs → broker burner → money trail → **TARGET LOCKED**
-  (a red PRIME SUSPECT stamp slams onto the board) → jail-origin link → anomaly spike. Press **Next ▶**
-  at each speaker's cue; the camera flies, everything else dims, and the AI
-  case log types each finding with its evidence source. **Exit** restores the
-  full graph and prints the complete investigator brief.
-- **Click any node** — opens its Entity Dossier: influence/broker scores plus
-  every evidence edge cited to its source (FIR no., ₹ amount, call count).
-- **Filter chips** (top-right) — toggle Calls / Money / Co-accused / Jail edges.
-  Turning on only Money makes the ₹ trail to the kingpin pop for judges.
-- **Search (press /)** — type a name, Enter → camera flies to the entity.
-- **Tamper Test** — simulates a rogue admin editing a past audit record: the
-  chain strip at the bottom snaps red/BROKEN, an alert fires, then the record
-  restores. Blockchain accountability, visible in 5 seconds.
-
-## 🔁 Regenerating / editing the data
-
-All demo data is synthetic and reproducible:
 ```bash
-python backend/generate_data.py     # rebuilds data/ from scratch (fixed seed)
+python -m pytest tests -q
 ```
-Want to add your own FIRs? Drop `.txt` files into `data/firs/` following the same
-format, then open http://localhost:8000/api/rebuild and refresh — the graph updates.
 
-## 🎬 The demo story (memorize this!)
+Expect **182 passed** in about two seconds. The suite runs against a
+temporary copy of `data/`, so it never changes the shipped corpus. It covers
+the adversarial identity cases, the no-evidence-no-edge guarantee, tamper
+detection, temporal windows, the intake validator, the assistant, the reset
+script, terminology, and the HTTP contract end to end.
 
-The datasets hide a crime network the system uncovers **live**:
-1. Two gangs — Delhi drugs (blue) and Mumbai smuggling (green) — appear as two clusters.
-2. A **red burner phone** (9990001111, unregistered) talks to BOTH gang leaders → broker.
-3. A **yellow shell company** (OM TRADERS) collects money from both leaders.
-4. The money exits to **Vikram Rathore** — a man named in **ZERO FIRs**. The AI flags
-   him as the hidden kingpin. That's your "wow" moment.
-5. A dashed purple edge shows Ramesh & Salim were **jailed together in Tihar Block-4** —
-   how the gangs first connected.
-6. Anomaly panel: call spike on 18–19 March = 48h before the (fictional) Mundra seizure.
-7. Click **Tamper Test** → shows the blockchain audit chain catching a rogue edit.
+### Reset before a demo
 
-## 🧪 Quick self-test without the server
+```bash
+python backend/reset_demo_data.py
+```
+
+Stop the server first. This restores every corpus file from `data/seed/`,
+removes rows and FIRs added through ADD DATA, staged files, recorded decisions
+and the audit chain (add `--keep-audit` to keep it; `--dry-run` to preview).
+Start the server again afterwards.
+
+## The dashboard — what each control does
+
+| Control | What it does |
+|---|---|
+| **⦿ Crack the Case** | Six guided steps: two clusters → the broker → follow the money → potential network controller → shared custody → the anomaly. Press **Next ▶** on each speaker's cue. |
+| **Click any node** | Entity dossier: identifiers, every relationship with its confidence and source records, lead score breakdown, identity candidates, anomalies, and the FIR case file. |
+| **Click any string** | Evidence drawer: which records, which algorithm, and the confidence arithmetic. |
+| **Window** (All / 30d / 7d / 24h) | Narrows relationships to those observed in the window. Anchored to the latest record in the case, and labelled as such. |
+| **Leads** | Investigative Lead Score, ranked, with all eight factors. Record VERIFIED / DISMISSED / NEEDS_REVIEW on each. |
+| **Entity Search** | Search by name, phone, vehicle or account; identity candidates with reasons; auto-merged is always 0. |
+| **Timeline** | 96 dated events on the case clock: FIRs, daily call activity, transactions, travel, custody. |
+| **Chat bubble** | Ask a question in plain words — every bullet cites a record id. Try the examples it offers. |
+| **＋ Add Data** | Paste JSON / CSV / raw FIR text → **Validate & preview** → **Add to case**. Bad values are held, conflicts flagged, nothing corrected silently. |
+| **🔒 Tamper Test** | Edits an audit block on a copy; the chain reports itself broken and the live chain stays valid. |
+| **Audit** | The hash chain, filterable by officer and action. |
+| **Generate Report** | A printable brief of the current findings, all cited. |
+
+Map & Location is a Phase 2 placeholder and says so.
+
+## The demo story
+
+The records contain a network the system surfaces live, with sources:
+
+1. **Three clusters.** Community detection separates the network; the two most central figures lead the two largest clusters.
+2. **An unresolved number** contacts entities in both clusters. No subscriber is registered to it, and the system says the holder is not established.
+3. **Money converges** on a corporate entity from several parties and moves on.
+4. **It exits to Vikram Rathore**, named in zero FIRs — flagged as a Potential Network Controller for review, with the uncertainty stated.
+5. **The two leaders overlapped in custody** in 2022 — proximity, not association, and four years before the case window.
+6. **A communication spike**, measured against that pair's own median day.
+7. **Tamper Test** shows the audit chain catching an edit.
+
+Every step names its evidence. Nothing on screen claims guilt.
+
+## Terminal self-test
 
 ```bash
 python backend/engine.py
 ```
-Prints the stats + full investigator brief in the terminal. If this works, everything works.
 
-## 🆘 Troubleshooting
+Prints stats, findings, leads and the brief. If this works, everything works.
+
+## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `pip` not found | Use `pip3` / reinstall Python with PATH ticked |
-| Port 8000 busy | `uvicorn backend.main:app --port 8080` |
-| Graph is blank | You're offline and CDN didn't load — see offline note above |
-| Fonts look plain | Same CDN issue — cosmetic only, demo still works |
-| `ModuleNotFoundError: backend` | You must run uvicorn from the `sih-package` folder root |
+| `pip` not found | Use `pip3`, or reinstall Python with "Add to PATH" ticked |
+| Port 8000 busy | `python -m uvicorn backend.main:app --port 8080` |
+| `ModuleNotFoundError: backend` | Run from the `sih-package` folder, not from `backend/` |
+| Board unchanged after editing files in `data/` | Open http://localhost:8000/api/rebuild, or restart the server |
+| Laptop has leftover rows / decisions | Stop the server, run `python backend/reset_demo_data.py`, start again |
+| Fonts look plain | Google Fonts did not load; cosmetic only |
 
-## 👥 Team roles → see `docs/DEMO_SCRIPT_6_MEMBERS.md`
-## 🎤 Judge questions → see `docs/JUDGE_QA.md`
+## Team roles → `docs/DEMO_SCRIPT_6_MEMBERS.md`
+## Judge questions → `docs/JUDGE_QA.md`

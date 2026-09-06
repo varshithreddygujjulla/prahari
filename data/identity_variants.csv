@@ -1,0 +1,16 @@
+record_id,observed_name,source_hint,phone,account,vehicle,note
+IDV-A1,R. Yadav,legacy_fir_index_2023,9811000002,,,Given name recorded as initial only
+IDV-A2,RAMESH YADAV,travel_manifest_scan,,ACC9002,,All-caps manifest entry
+IDV-A3,Ramesh Yadhav,handwritten_seizure_memo,9811000002,,DL01AB4455,Transcription spelling variant
+IDV-B1,Ramesh Yadava,municipal_complaint_register,9733410088,ACC5521,,Different individual - no shared identifiers with IDV-A group
+IDV-B2,Vikram Rathod,tenant_verification_form,9744120915,ACC5522,,Different individual - surname differs by one character
+IDV-C1,V. Rathore,customs_declaration_scan,9811000001,ACC9001,DL08VR0001,Given name recorded as initial only
+IDV-C2,Vikram Rathorey,airline_pnr_record,,ACC9001,,Trailing character variant in PNR
+IDV-D1,Saleem Qureshi,port_gatepass_register,9822000001,,MH02XY9911,Alternate transliteration of given name
+IDV-D2,S. Qureshi,warehouse_visitor_log,9822000001,,,Given name recorded as initial only
+IDV-E1,Amit Patel,vehicle_challan_record,9817987691,,MH77ZZ3980,Consistent across all identifiers
+IDV-E2,Amit Patil,property_registration_index,9688204471,ACC5530,,Different individual - common surname variant
+IDV-F1,Sunil Kumar,ration_card_index,9811000003,ACC9003,,Consistent across all identifiers
+IDV-F2,Sunil Kumaar,bank_kyc_correction_log,9811000003,ACC9003,,Keying error corrected in later record
+IDV-G1,Pooja Mehra,telecom_reassignment_log,9850008738,ACC5540,,Number later reassigned - shares handset with a different registered holder
+IDV-H1,Deepak Singh,transport_permit_index,9811000004,ACC9004,DL01AB4455,Vehicle used by a different person from its registered owner

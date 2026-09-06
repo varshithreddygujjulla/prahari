@@ -1,94 +1,165 @@
-# 🎬 6-Member Demo Script — SIH 26189
-**Total time: ~7 minutes talk + Q&A. Rehearse at least 3 full runs.**
+# 6-Member Demo Script — SIH 26189 PRAHARI
+**~7 minutes of talk + Q&A. Rehearse at least three full runs on the venue laptop.**
+
+Every sentence below is something the software actually shows. Do not add
+claims the screen does not support: the system surfaces *leads with evidence*,
+it does not name offenders, and every confidence is below 100.
+
+## Before the slot (M2, 10 minutes before)
+
+```bash
+python backend/reset_demo_data.py          # pristine corpus, fresh audit chain
+python -m uvicorn backend.main:app         # from inside sih-package/
+```
+
+Open http://localhost:8000, wait for the board, and leave the tab open. The
+graph library is vendored, so only Google Fonts need internet.
 
 ## Role assignment
 
 | # | Role | Owns |
 |---|------|------|
-| M1 | **Team Lead / Opener** | Problem statement, closing, judge Q&A traffic control |
-| M2 | **Driver** | Laptop; presses **Next ▶** in Crack-the-Case mode exactly on each speaker's cue |
-| M3 | **Data & NLP Engineer** | Ingestion + entity extraction slide/explanation |
-| M4 | **Graph Scientist** | Algorithms: PageRank, Louvain, link prediction, anomaly |
-| M5 | **Blockchain & Security** | Audit chain, privacy, DPDP Act compliance |
-| M6 | **Product & Impact** | Govt deployment path, feasibility, business slide |
+| M1 | **Team lead / opener** | Problem statement, closing, routes judge questions |
+| M2 | **Driver** | Laptop; presses **Next ▶** exactly on each speaker's cue |
+| M3 | **Data & ingestion** | Record ids, ADD DATA, the FIR extractor |
+| M4 | **Graph & analytics** | Clusters, lead score, anomalies, entity resolution |
+| M5 | **Audit & security** | Hash chain, tamper test, DPDP Act framing |
+| M6 | **Product & deployment** | Production path, cost, who uses it |
 
 ---
 
-## MINUTE 0–1 · M1 (Opening — while M2 gets the dashboard up)
+## MINUTE 0–1 · M1 (opening, while the board is on screen)
 
-> "Good morning judges. Problem 26189 from the Ministry of Home Affairs asks a
-> simple question with a hard answer: India's investigators are drowning in
-> disconnected data. An FIR in Delhi, call records in a telecom database, a bank
-> trail in Mumbai — today a human has to connect those dots by hand, across
-> states, across weeks. Our system does it in seconds. We call it a map of the
-> criminal world. Let me show you a case being cracked — live."
+> "Problem 26189 asks how an investigator connects an FIR in Delhi, call
+> records at a telecom, and a bank trail in Mumbai — today that is done by
+> hand, across weeks. PRAHARI ingests those records, correlates them into an
+> evidence graph, and ranks what to look at next. Two rules run through
+> everything you will see: nothing is asserted without a source record, and
+> nothing is ever a finding of guilt — every output is an investigative lead
+> that requires human verification. Let me show you the case."
 
-## MINUTE 1–3 · M3 (Data in) — M2 reloads the page so judges see the BOOT SEQUENCE, then clicks **⦿ Crack the Case**
+## MINUTE 1–2 · M3 (data in) — M2 stays on **Overview**
 
-> "We've loaded 21 FIRs as raw text, plus call detail records, bank transfers,
-> prison rosters, travel logs and vehicle registrations — all synthetic, all
-> matching the real schemas of CCTNS, telecom CDRs and FIU data. Watch the left
-> panel: our NLP layer just read every FIR narrative and pulled out names,
-> phone numbers and relationships — no human tagging. Every person becomes a
-> node. Every call, payment, co-accusation or shared jail cell becomes an edge."
+> "Twenty-one FIRs as raw text, 118 call-detail rows, 35 bank transfers, the
+> subscriber and account registries, vehicles, travel and custody — 271
+> records, all synthetic, each with a stable id you will see cited on screen.
+> The FIR extractor is one regex shared by the loader and the ADD DATA
+> preview, so what the preview shows is exactly what lands on the board."
 
-*(M2 presses **Next ▶** → Step 1 highlights the two gangs as M4 begins.)*
+*(M2 clicks **⦿ Crack the Case**. Step 1 appears.)*
 
-## MINUTE 3–5 · M4 (The reveal) — M2 presses **Next ▶** on each paragraph: Step 2 broker → Step 3 money → Step 4 **TARGET LOCKED** → Step 5 jail → Step 6 anomaly
+## MINUTE 2–4 · M4 (the six steps) — M2 presses **Next ▶** at each cue
 
-> "Now the graph algorithms. Community detection instantly separates two gangs —
-> blue is a Delhi drug network, green a Mumbai smuggling ring. But look at this
-> red node: an **unregistered burner phone** talking to BOTH gang leaders. Our
-> betweenness analysis flags it as the broker.
->
-> Follow the yellow edges — money. Both leaders pay the same shell company, OM
-> Traders. And the shell forwards ₹7 lakh to this man: **Vikram Rathore**.
-> Here's the thing, judges — *Vikram appears in zero FIRs*. No investigator
-> reading paperwork would ever find him. Our AI flags him in one second:
-> financially central, operationally invisible — the hidden kingpin.
->
-> Two more things. The dashed purple edge: our system found the two gang leaders
-> shared a cell block in Tihar in 2022 — that's how the network formed. And the
-> anomaly panel: an 8x spike in calls on 18 March — exactly 48 hours before the
-> seizure in our case data. Spikes like this can trigger proactive alerts."
+**Step 1 · Two clusters**
+> "Community detection separates the network into three clusters. The two most
+> central figures are the cluster leaders. Clusters are statistical groupings,
+> not proven organisations — the panel says so."
 
-## MINUTE 5–6 · M5 (Blockchain) + M2 clicks **Tamper Test**
+**Step 2 · The broker**
+> "This unresolved number contacts entities in both clusters. No subscriber is
+> registered to it, so the records do not tell us who held the handset — and
+> the system says exactly that instead of guessing."
 
-> "Power like this needs accountability. The theme is Blockchain & Cybersecurity,
-> and here's why it matters: every single query an officer runs is written to a
-> SHA-256 hash chain — each block sealed by the previous block's hash.
-> [M2 clicks Tamper Test] We just simulated a rogue admin editing a past record
-> to hide a search — and the chain instantly reports itself broken. No one can
-> spy on innocent citizens and erase the evidence. In production this chain sits
-> on a permissioned Hyperledger network across NCRB nodes."
+**Step 3 · Follow the money**
+> "Funds from several parties converge on one corporate entity and move on —
+> the shape associated with layering. The panel also notes consolidation is
+> ordinary commerce; the pattern is a lead, not a conclusion."
 
-## MINUTE 6–7 · M6 + M1 (Deployment & close)
+**Step 4 · Potential network controller**
+> "Money exits to Vikram Rathore, who is named in zero FIRs in this corpus.
+> Financially central, absent from the paperwork. He is flagged for review —
+> and the dossier lists the uncertainty: absence from FIRs may be a gap in the
+> corpus, not non-involvement."
+
+**Step 5 · Shared custody**
+> "Both leaders overlapped in custody in 2022. Shared custody establishes
+> proximity, not association, and it predates the case window by four years —
+> the system labels it that way."
+
+**Step 6 · The anomaly**
+> "A communication spike, quantified against that pair's own median day —
+> the ratio is on screen. A deviation is a lead to examine, not proof."
+
+*(M2 clicks **Done ✓**, then clicks the string between **Ramesh Yadav** and
+**Sunil Kumar**.)*
+
+> "Click any relationship and you get the evidence drawer: which records, which
+> algorithm, and the arithmetic behind the confidence — base for the relation,
+> plus corroboration per independent source type, capped at 97. Nothing in
+> this system reaches 100."
+
+## MINUTE 4–5 · M4 (leads & identity) — M2 opens **Leads**, then **Entity Search**
+
+> "The Investigative Lead Score ranks entities on eight capped factors that
+> sum to 100, every point attributable to records. Ramesh Yadav tops the list
+> at 67 — REVIEW band — and you can read exactly which findings put him there.
+> Then identity: the resolver scores 'R. Yadav', 'RAMESH YADAV' and 'Ramesh
+> Yadhav' as likely the same person, but 'Ramesh Yadava' — one letter away —
+> is kept separate because its phone and account conflict. Auto-merged: zero.
+> A person confirms or rejects each match, and that decision is recorded."
+
+*(M2 clicks the chat bubble, types **Who received the most money**, then
+**What happened on 2026-03-18**.)*
+
+> "The assistant answers only from the case records — every bullet cites its
+> record id, and if it has to interpret a misspelt name it says so. There is
+> no language model in this prototype, so it cannot invent a connection."
+
+## MINUTE 5–6 · M5 (accountability) — M2 clicks **Tamper Test**, then opens **Audit**
+
+> "Every request you just saw was written to a SHA-256 hash chain before it was
+> served. The tamper test edits block 1 on a copy — the chain reports itself
+> broken at block 1, and the live chain verifies intact. Officers' access is
+> logged immutably; that is the accountability the Blockchain & Cybersecurity
+> theme asks for, and the basis for DPDP Act purpose limitation."
+
+## MINUTE 6–7 · M3 (ADD DATA) + M6 + M1 (close)
+
+*(M2 clicks **＋ Add Data**, chooses **bank**, **Load example**, **Validate & preview**.)*
+
+M3:
+> "Two rows pasted: the first is valid, the second has a null amount. Nothing
+> is corrected silently — the bad row is held as INVALID, the good one is
+> committable, and a conflict against an existing holder would be flagged, not
+> overwritten. Add to case rebuilds the graph and writes an audit block."
 
 M6:
-> "Deployment is realistic: in production these CSV loaders are replaced by
-> secure APIs to CCTNS, telecom providers and FIU — same schema, which is why we
-> mocked it this way. The stack — FastAPI, NetworkX today, Neo4j at scale,
-> React — is entirely open source: zero licensing cost to the government. It's
-> effectively a mini-NATGRID for street-level crime investigation."
+> "Deployment replaces the CSV loaders with connectors to CCTNS, telecom and
+> FIU-IND — the record shape is the same. NetworkX today, Neo4j at scale; the
+> stack is entirely open source, so the cost is compute and integration, not
+> licences."
 
 M1:
-> "From a pile of paperwork to a prime suspect in seconds, with a tamper-proof
-> audit trail protecting citizens' rights. That's our answer to problem 26189.
-> Happy to take questions."
+> "From scattered records to a ranked, cited, human-verified set of leads,
+> with a tamper-evident audit trail. That is our answer to 26189. Questions?"
 
 ---
 
+## Cue sheet for M2
+
+| Speaker says | M2 does |
+|---|---|
+| M3 "…lands on the board" | click **⦿ Crack the Case** |
+| M4 each step heading | **Next ▶** (six times), then **Done ✓** |
+| M4 "Click any relationship…" | click the Ramesh Yadav ↔ Sunil Kumar string |
+| M4 "The Investigative Lead Score…" | nav **Leads**; click Ramesh Yadav |
+| M4 "Then identity…" | nav **Entity Search** → identity candidates |
+| M4 "The assistant…" | chat bubble → the two questions above |
+| M5 "The tamper test…" | click **🔒 Tamper Test**, then nav **Audit** |
+| M3 "Two rows pasted…" | **＋ Add Data** → bank → Load example → Validate & preview |
+
 ## Q&A protocol
-- ALL questions go to **M1 first**, who routes: data→M3, algorithms→M4,
-  security/privacy→M5, deployment/cost→M6. M2 drives any "show me" requests.
-- Never talk over each other. If unsure, M1 says: "Great question — our
-  production roadmap covers that" and gives the honest partial answer.
-- Rehearse the **Next ▶ timing** — the TARGET LOCKED overlay must land exactly when M4 says "Vikram appears in zero FIRs".
-- After Exit, click **Vikram Rathore's node** if judges ask for proof: the dossier shows every rupee and call, cited.
-- The **Tamper Test** is your safety "wow" if judges look bored.
+- All questions to **M1 first**, who routes: data → M3, algorithms → M4,
+  audit/privacy → M5, deployment/cost → M6. M2 drives any "show me".
+- If unsure, say what the software does and does not do; never claim a
+  capability that is not on screen. `docs/JUDGE_QA.md` has the prepared answers.
+- **Proof on demand:** click any node → dossier with every relationship cited;
+  `/api/evidence/FIR_007` shows what one record supports; `/api/config` shows
+  every threshold.
 
 ## Backup plans
-- If WiFi dies and the graph won't load: run `python backend/engine.py` in the
-  terminal — the full investigator brief prints as text. Narrate from that.
-- Keep screenshots of the loaded dashboard in `ppt/` folder open in a tab.
-- M2 should do a full dry run on the venue machine BEFORE judging starts.
+- Board will not load: `python backend/engine.py` prints stats, leads and the
+  brief in the terminal — narrate from that.
+- Wrong state on the laptop (stray rows, decisions): stop the server and run
+  `python backend/reset_demo_data.py`, then start it again.
+- Fonts look plain: Google Fonts did not load; cosmetic only.

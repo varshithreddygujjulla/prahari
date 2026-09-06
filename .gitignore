@@ -28,3 +28,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# PRAHARI runtime state (recreated by the server / ADD DATA; reset with backend/reset_demo_data.py)
+data/audit_chain.json
+data/decisions.json
+data/cctv.csv
+data/gps.csv
+data/social.csv

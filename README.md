@@ -1,6 +1,34 @@
 # PRAHARI Evidence Board — SIH 26189
-### AI-Powered Criminal Network Analysis System
+### Investigative Intelligence & Evidence Correlation Platform
 **Ministry of Home Affairs · NCRB · Theme: Blockchain & Cybersecurity**
+
+> **PHASE 1 IS IMPLEMENTED.** The backend has been refactored into modules and
+> five P0 capabilities added: evidence provenance, entity resolution,
+> investigative lead scoring, a temporal graph, and a configurable anomaly
+> engine — plus the terminology pass and false-positive safeguards.
+> **Read [docs/PHASE1.md](docs/PHASE1.md) first**; it supersedes this document
+> wherever the two disagree.
+>
+> Sections below marked *(pre-Phase 1)* describe the original build and are kept
+> for history. In particular: the backend is no longer three files, anomaly
+> detection is no longer a single fixed rule, and the terms "Hidden Kingpin",
+> "Prime Suspect" and "Burner Phone" have been replaced throughout
+> (see PHASE1 §8).
+
+**Quick facts after Phase 1**
+
+| | |
+|---|---|
+| Backend | 8 packages + `pipeline.py`, behind a compatibility shim (`engine.py`) |
+| Tests | 182 passing (`python -m pytest tests -q`), against a temporary copy of `data/` |
+| Graph | 39 nodes · 78 edges · 3 clusters · 28 people |
+| Records ingested | 271 across 9 sources, each with a stable ID |
+| Anomaly findings | 24 (4 critical / 5 high / 14 medium / 1 low) |
+| Identity candidates | 9 matches, 4 clusters, **0 auto-merged** |
+| Time windows | all · 30d · 7d · 24h · custom, anchored to the case clock |
+| Also | ADD DATA intake, grounded assistant (`/api/ask`, no LLM), investigator decisions, demo reset script |
+
+---
 
 > **For AI assistants reading this repo:** This document is intentionally comprehensive. Every file, module, data schema, API endpoint, algorithm, and design decision is documented here so you can understand and work with this codebase without needing external context.
 
@@ -30,7 +58,7 @@ PRAHARI ("guardian/sentinel" in Hindi) is an investigative intelligence dashboar
 
 The system answers the question: *"Given scattered data across multiple agencies, who is at the center of a criminal network — especially people who never appear in any FIR?"*
 
-### Core capabilities
+### Core capabilities *(pre-Phase 1 — see docs/PHASE1.md for current)*
 | Capability | What it does |
 |---|---|
 | **NER / Entity Extraction** | Regex-based Named Entity Recognition over raw FIR text. Pulls names, phone numbers, co-accusation relationships. |
@@ -50,15 +78,31 @@ sih-package/               <- Root. Run ALL commands from here.
 |
 +-- README.md              <- This file (comprehensive)
 +-- README_START_HERE.md   <- Short quickstart for demo day
-+-- requirements.txt       <- Python dependencies (4 packages)
++-- requirements.txt       <- Python dependencies
 |
 +-- backend/
-|   +-- engine.py          <- THE BRAIN. All data processing + analytics (268 lines)
-|   +-- main.py            <- FastAPI server. 4 routes. (56 lines)
-|   +-- generate_data.py   <- Synthetic data generator (207 lines, fixed seed)
+|   +-- config.py          <- every threshold, weight and notice
+|   +-- pipeline.py        <- orchestration + fingerprint-keyed cache
+|   +-- main.py            <- FastAPI app (routes live in api/routes.py)
+|   +-- engine.py          <- compatibility shim; `python backend/engine.py` self-test
+|   +-- reset_demo_data.py <- restore data/ from data/seed/
+|   +-- generate_data.py   <- original synthetic data generator (historical; the
+|   |                         shipped corpus has since been curated by hand)
+|   +-- ingestion/         <- loaders.py (stable ids, shared FIR extractor), intake.py (ADD DATA)
+|   +-- evidence/          <- provenance ledger + confidence model
+|   +-- graph/             <- temporal graph, windows, timeline
+|   +-- entity_resolution/ <- candidate identity matching
+|   +-- analytics/         <- centrality, clusters, lead scoring
+|   +-- anomaly/           <- 10 detectors
+|   +-- assistant/         <- grounded /api/ask
+|   +-- cases/             <- investigator decisions store
+|   +-- audit/             <- SHA-256 hash chain
+|   +-- api/               <- HTTP routes
 |
 +-- frontend/
-|   +-- index.html         <- Entire UI in one self-contained HTML file (716 lines)
+|   +-- app.html, dashboard.js  <- the dashboard (default at /)
+|   +-- index.html, phase1.*    <- the original corkboard (at /classic)
+|   +-- vendor/vis-network.min.js <- vendored graph library (offline)
 |
 +-- data/
 |   +-- firs/              <- 21 synthetic FIR text files (FIR_001.txt to FIR_021.txt)
@@ -67,11 +111,17 @@ sih-package/               <- Root. Run ALL commands from here.
 |   +-- prison.csv         <- Prison stay records
 |   +-- travel.csv         <- Air travel records
 |   +-- vehicles.csv       <- Vehicle registration
-|   +-- phone_directory.csv <- Phone -> registered owner mapping (burner is absent)
+|   +-- phone_directory.csv <- Phone -> registered owner mapping (9990001111 is absent)
 |   +-- accounts.csv       <- Bank account -> holder name mapping
-|   +-- audit_chain.json   <- Persisted blockchain audit log
+|   +-- identity_variants.csv <- alternate spellings for the resolver (own record_id column)
+|   +-- seed/              <- pristine copy of the corpus, used by reset_demo_data.py
+|   +-- audit_chain.json   <- Persisted audit log (created on first request)
+|   +-- decisions.json     <- investigator verdicts (created on first decision)
+|
++-- tests/                 <- 182 tests
 |
 +-- docs/
+|   +-- PHASE1.md          <- What Phase 1 changed and why
 |   +-- ARCHITECTURE.md    <- System design + prototype-to-production mapping
 |   +-- DEMO_SCRIPT_6_MEMBERS.md <- Line-by-line 7-minute demo script
 |   +-- JUDGE_QA.md        <- 20 anticipated judge questions with answers
@@ -110,11 +160,16 @@ python backend/engine.py
 # Prints stats + full investigator brief in the terminal
 ```
 
-### Regenerate synthetic data from scratch
+### Reset the demo corpus
 ```bash
-python backend/generate_data.py
-# Rebuilds all files in data/ with a fixed random seed (26189)
+python backend/reset_demo_data.py
+# Restores data/ from data/seed/; removes rows/FIRs added via ADD DATA,
+# staged files, decisions and the audit chain. Stop the server first.
 ```
+
+`generate_data.py` is the original generator and is kept for history. The
+shipped corpus has been curated since (identity variants, registry fixes), so
+regenerating would produce a different dataset — use the reset script instead.
 
 ---
 
@@ -147,7 +202,7 @@ The synthetic datasets encode a real criminal network structure. The system unco
 
 ---
 
-## 5. Backend — Deep Dive
+## 5. Backend — Deep Dive *(pre-Phase 1 layout; see docs/PHASE1.md §2)*
 
 ### `engine.py`
 
@@ -307,7 +362,9 @@ Account IDs, not names. Resolved via `accounts.csv`.
 phone, registered_name
 9811000001, Vikram Rathore
 ```
-`9990001111` (burner) is deliberately absent — causes it to appear as a `burner_phone` node.
+`9990001111` is deliberately absent — it therefore appears as an `unresolved_number`
+node. A `phone` that is not a 10-digit Indian mobile number (first digit 6–9)
+is flagged on load and ignored by the graph builder and the resolver.
 
 ### `data/accounts.csv` columns
 ```
@@ -378,7 +435,7 @@ The UI is a detective's corkboard:
 
 ---
 
-## 8. API Reference
+## 8. API Reference *(pre-Phase 1; 12 endpoints now — see docs/PHASE1.md §9)*
 
 **Base URL:** `http://localhost:8000`
 
@@ -480,16 +537,22 @@ Replace JSON file with Hyperledger Fabric across NCRB data centres. Each node ho
 
 ## 12. Adding New Data
 
-### Add new FIRs
+### Through the UI (preferred)
+**＋ Add Data** → pick a source → paste JSON / CSV or raw FIR text →
+**Validate & preview** → **Add to case**. Malformed values are held, conflicts
+with existing holders are flagged, duplicates are detected, and the graph
+rebuilds with an audit block. `python backend/reset_demo_data.py` undoes it all.
+
+### Add new FIRs by file
 1. Drop a `.txt` into `data/firs/` following the FIR format (Section 6).
-2. Suspect names must follow trigger words in `Firstname Lastname` format.
+2. Names must follow a trigger word (case-insensitive) in `Firstname Lastname` format.
 3. Hit `http://localhost:8000/api/rebuild`.
 
 ### Add CDR rows
 Edit `data/cdr.csv`. Format: `caller_phone, receiver_phone, YYYY-MM-DD HH:MM, duration_sec, tower_id`
 
 ### Add people to phone directory
-Edit `data/phone_directory.csv`: `phone, registered_name`. Absent phones appear as burner nodes.
+Edit `data/phone_directory.csv`: `phone, registered_name`. Absent phones appear as unresolved-number nodes; invalid phones are flagged and ignored.
 
 ### Add bank transactions
 Edit `data/bank.csv`: `from_account, to_account, amount_inr, date`. Accounts must exist in `data/accounts.csv`.

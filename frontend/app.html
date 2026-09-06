@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRAHARI · Investigative Intelligence Platform</title>
+<!-- vendored: the board must work with no internet (air-gapped venue) -->
+<script src="/static/vendor/vis-network.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2128; --panel3:#21262d;
+  --border:#30363d; --border2:#3d444d;
+  --text:#e6edf3; --text2:#c9d1d9; --muted:#8b949e; --dim:#6e7681;
+  --blue:#4a9eff; --green:#3fb950; --amber:#d29922; --red:#f85149;
+  --purple:#a371f7; --accent:#1f6feb; --accent2:#388bfd;
+  --ui:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",monospace;
+  --sidebar:236px; --topbar:56px; --tabs:52px;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.5 var(--ui);overflow:hidden}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:5px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3d444d}
+.hidden{display:none!important}
+
+/* ---------------- topbar ---------------- */
+#topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar);z-index:50;
+  display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:var(--panel);border-bottom:1px solid var(--border)}
+.emblem{width:30px;height:30px;border-radius:6px;flex-shrink:0;
+  background:linear-gradient(135deg,#1f6feb,#388bfd);display:flex;align-items:center;
+  justify-content:center;font-size:16px}
+.brand{display:flex;flex-direction:column;line-height:1.15;flex-shrink:0}
+.brand b{font:700 16px var(--ui);letter-spacing:.02em}
+.brand span{font:500 9px var(--mono);color:var(--muted);letter-spacing:.08em}
+.casechip{display:flex;flex-direction:column;line-height:1.2;padding-left:14px;
+  border-left:1px solid var(--border);flex-shrink:0}
+.casechip .ct{display:flex;align-items:center;gap:8px;font:600 13px var(--ui)}
+.casechip .ct .badge{font:600 9px var(--mono);letter-spacing:.06em;color:var(--green);
+  border:1px solid var(--green);border-radius:3px;padding:1px 6px}
+.casechip .cs{font:400 11px var(--ui);color:var(--muted)}
+#gsearch{flex:1;max-width:560px;margin:0 auto;position:relative}
+#gsearch input{width:100%;background:var(--panel2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font:14px var(--ui);padding:8px 12px 8px 34px;outline:none}
+#gsearch input:focus{border-color:var(--accent)}
+#gsearch .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)}
+#gsearch .kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  font:500 10px var(--mono);color:var(--dim);border:1px solid var(--border);
+  border-radius:4px;padding:1px 5px}
+#gresults{position:absolute;top:42px;left:0;right:0;background:var(--panel2);
+  border:1px solid var(--border);border-radius:8px;max-height:320px;overflow:auto;z-index:60;
+  box-shadow:0 12px 32px rgba(0,0,0,.5)}
+#gresults .gr{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:9px;
+  border-bottom:1px solid var(--border)}
+#gresults .gr:hover{background:var(--panel3)}
+.topright{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.icobtn{position:relative;width:34px;height:34px;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;color:var(--muted)}
+.icobtn:hover{background:var(--panel3);color:var(--text)}
+.icobtn .dot{position:absolute;top:5px;right:6px;width:14px;height:14px;border-radius:50%;
+  background:var(--red);color:#fff;font:600 9px var(--mono);display:flex;align-items:center;
+  justify-content:center}
+.user{display:flex;align-items:center;gap:9px}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#a371f7,#4a9eff);
+  display:flex;align-items:center;justify-content:center;font:600 13px var(--ui);color:#fff}
+.user .un{line-height:1.2}.user .un b{font:600 12px var(--ui);display:block}
+.user .un span{font:400 10px var(--ui);color:var(--muted)}
+
+/* ---------------- sidebar ---------------- */
+#sidebar{position:fixed;top:var(--topbar);left:0;bottom:0;width:var(--sidebar);z-index:40;
+  background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;
+  padding:10px 0}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 16px;margin:1px 8px;
+  border-radius:7px;color:var(--muted);font:500 13px var(--ui);cursor:pointer;user-select:none}
+.navitem:hover{background:var(--panel3);color:var(--text)}
+.navitem.on{background:rgba(31,111,235,.15);color:var(--accent2)}
+.navitem .ni{width:18px;text-align:center;flex-shrink:0}
+.navspring{flex:1}
+.sidefoot{padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--dim)}
+.sidefoot .q{font-style:italic;color:var(--muted);margin-bottom:10px;line-height:1.5}
+.sidefoot b{color:var(--text2);font-weight:600}
+
+/* ---------------- tabs + actions ---------------- */
+#tabsbar{position:fixed;top:var(--topbar);left:var(--sidebar);right:0;height:var(--tabs);z-index:30;
+  display:flex;align-items:center;gap:4px;padding:0 18px;background:var(--bg);
+  border-bottom:1px solid var(--border)}
+.tab{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:7px;
+  color:var(--muted);font:500 13px var(--ui);cursor:pointer;user-select:none}
+.tab:hover{background:var(--panel2);color:var(--text)}
+.tab.on{background:var(--accent);color:#fff}
+.tabspring{flex:1}
+.viewtitle{font:600 15px var(--ui);color:var(--text)}
+.abtn{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:7px;
+  font:600 13px var(--ui);border:1px solid var(--border2)}
+.abtn:hover{filter:brightness(1.12)}
+.abtn.blue{background:var(--accent);border-color:var(--accent);color:#fff}
+.abtn.ghost{background:var(--panel2);color:var(--text)}
+.abtn.red{background:#da3633;border-color:#da3633;color:#fff}
+
+/* ---------------- main ---------------- */
+#main{position:fixed;top:calc(var(--topbar) + var(--tabs));left:var(--sidebar);right:0;bottom:0;
+  overflow:auto;padding:16px 18px 22px}
+.view{display:none}.view.on{display:block}
+
+/* stat strip — slim single line, not tall cards */
+.stats{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin-bottom:12px;
+  padding:8px 16px;background:var(--panel);border:1px solid var(--border);border-radius:9px}
+.stat-i{display:inline-flex;align-items:baseline;gap:5px;font:400 12px var(--ui);color:var(--muted)}
+.stat-i .ic{font-size:13px;margin-right:2px}
+.stat-i b{font:700 15px var(--ui);color:var(--text)}
+.stat-i.lead b{color:var(--red)}
+.stat-sep{color:var(--border2);margin:0 12px}
+
+/* card */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px}
+.card-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.card-h .ci{color:var(--accent2)}
+.card-h h3{font:600 14px var(--ui);flex:1}
+.card-h .sub{font:400 11px var(--ui);color:var(--muted)}
+
+/* overview grid */
+.ov-grid{display:grid;grid-template-columns:1fr 340px;gap:14px;margin-bottom:14px}
+.ov-bottom{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:14px}
+@media(max-width:1400px){.ov-grid{grid-template-columns:1fr 320px}.stats{grid-template-columns:repeat(3,1fr)}}
+
+/* graph */
+.graphwrap{position:relative}
+.graphtools{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.graphtools .gsrch{flex:1;max-width:240px;position:relative}
+.graphtools input,.graphtools select{background:var(--panel2);border:1px solid var(--border);
+  border-radius:7px;color:var(--text);font:13px var(--ui);padding:6px 10px;outline:none}
+.graphtools input:focus,.graphtools select:focus{border-color:var(--accent)}
+#graph{height:600px;background:radial-gradient(circle at 50% 40%,#0f141c,#0a0d12)}
+.gfull{font:500 11px var(--ui);color:var(--muted);background:var(--panel2);
+  border:1px solid var(--border);border-radius:7px;padding:6px 11px;margin-left:6px;flex-shrink:0}
+.gfull:hover{color:var(--text);border-color:var(--border2)}
+/* full-screen graph: the card lifts out and fills the whole window */
+#graphCard.fullscreen{position:fixed;inset:0;z-index:88;margin:0;border-radius:0;
+  display:flex;flex-direction:column;border:0;overflow:hidden}
+#graphCard.fullscreen .graphtools{flex-shrink:0}
+#graphCard.fullscreen #graph{flex:1;min-height:0;height:auto}
+#graphCard.fullscreen .glegend{bottom:22px}
+body.graph-full{overflow:hidden}
+/* #main is position:fixed and so forms its own stacking context — the card's
+   z-index is trapped inside it and would paint behind the header. Lift the
+   whole #main above the top/side bars while a child is full-screen. */
+body.graph-full #main{z-index:95}
+.gwin{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:2px}
+.gwin span{font:500 11px var(--ui);color:var(--muted);padding:4px 9px;border-radius:5px;cursor:pointer}
+.gwin span.on{background:var(--accent);color:#fff}
+.glegend{position:absolute;left:14px;bottom:14px;background:rgba(22,27,34,.92);
+  border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11px}
+.glegend .lr{display:flex;align-items:center;gap:7px;color:var(--text2);padding:2px 0}
+.glegend .ld{width:9px;height:9px;border-radius:50%}
+
+/* entity panel */
+.ent-empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
+.ent-head{padding:16px;border-bottom:1px solid var(--border)}
+.ent-top{display:flex;align-items:center;gap:12px}
+.ent-av{width:46px;height:46px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:20px;background:var(--panel3)}
+.ent-name{font:700 17px var(--ui)}
+.ent-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tag{font:600 10px var(--ui);padding:2px 8px;border-radius:11px;border:1px solid}
+.tag.blue{color:var(--blue);border-color:rgba(74,158,255,.4);background:rgba(74,158,255,.1)}
+.tag.amber{color:var(--amber);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.1)}
+.tag.red{color:var(--red);border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.1)}
+.tag.green{color:var(--green);border-color:rgba(63,185,80,.4);background:rgba(63,185,80,.1)}
+.tag.mut{color:var(--muted);border-color:var(--border2);background:var(--panel3)}
+.ent-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--border)}
+.ent-tab{font:500 12px var(--ui);color:var(--muted);padding:9px 11px;cursor:pointer;
+  border-bottom:2px solid transparent}
+.ent-tab:hover{color:var(--text)}
+.ent-tab.on{color:var(--accent2);border-bottom-color:var(--accent2)}
+.ent-body{padding:14px 16px;max-height:440px;overflow:auto}
+.sec-h{font:600 12px var(--ui);color:var(--muted);margin:2px 0 8px;text-transform:uppercase;
+  letter-spacing:.04em}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #21262d;
+  font-size:13px}
+.kv .k{color:var(--muted);flex-shrink:0}
+.kv .v{color:var(--text2);text-align:right;word-break:break-word}
+.kv .v.link{color:var(--accent2);cursor:pointer}
+.scorebar{height:6px;border-radius:3px;background:var(--panel3);overflow:hidden;margin-top:4px}
+.scorebar i{display:block;height:100%;background:linear-gradient(90deg,#d29922,#f85149)}
+.btn-full{display:block;width:100%;text-align:center;margin-top:14px;padding:9px;border-radius:7px;
+  background:var(--accent);color:#fff;font:600 13px var(--ui)}
+.btn-full:hover{filter:brightness(1.1)}
+.conn{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #21262d;
+  cursor:pointer;font-size:13px}
+.conn:hover{background:var(--panel2)}
+.conn .cdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.conn .cn{flex:1}.conn .cr{font:400 11px var(--ui);color:var(--muted)}
+.conn .cc{font:600 11px var(--mono);color:var(--green)}
+.rec{border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:7px;
+  background:var(--panel2)}
+.rec .rid{font:600 11px var(--mono);color:var(--accent2)}
+.rec .rt{font:400 10px var(--mono);color:var(--muted);float:right}
+.rec .rd{font:400 12px var(--ui);color:var(--text2);margin-top:3px}
+.disc{font:400 11.5px var(--ui);color:#b3bcc7;background:rgba(210,153,34,.08);
+  border-left:3px solid var(--amber);padding:6px 9px;border-radius:0 5px 5px 0;margin-top:10px;
+  line-height:1.5}
+
+/* widgets */
+.wlist .wi{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.wi .wic{width:30px;height:30px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:14px}
+.wi .wt{font:500 12.5px var(--ui);line-height:1.35}
+.wi .wd{font:400 11px var(--ui);color:var(--muted);margin-top:2px}
+.wi .wtime{font:400 10px var(--mono);color:var(--dim);margin-left:auto;flex-shrink:0}
+.insight{display:flex;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:12.5px;
+  line-height:1.4;cursor:pointer}
+.insight:hover{background:var(--panel2)}
+.insight .in-n{width:19px;height:19px;border-radius:50%;background:var(--panel3);color:var(--accent2);
+  font:600 11px var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.insight .in-c{font:600 10px var(--mono);color:var(--green);margin-left:6px}
+
+/* mini timeline */
+.mtl{padding:16px 18px}
+.mtl-track{position:relative;height:2px;background:var(--border);margin:26px 8px 8px}
+.mtl-ev{position:absolute;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;
+  border-radius:50%;border:3px solid var(--bg);cursor:pointer}
+.mtl-lb{position:absolute;top:14px;transform:translateX(-50%);text-align:center;white-space:nowrap}
+.mtl-lb .d{font:600 10px var(--mono);color:var(--text2)}
+.mtl-lb .t{font:400 9px var(--ui);color:var(--muted)}
+
+/* leads */
+.leadcard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;
+  margin-bottom:12px;cursor:pointer}
+.leadcard:hover{border-color:var(--border2)}
+.lc-top{display:flex;align-items:center;gap:12px}
+.lc-name{font:600 15px var(--ui);flex:1}
+.lc-score{font:700 20px var(--mono)}
+.lc-band{font:600 10px var(--ui);letter-spacing:.05em;padding:2px 8px;border-radius:11px}
+.lc-bar{height:8px;border-radius:4px;background:var(--panel3);margin:10px 0;overflow:hidden;display:flex}
+.lc-bar i{height:100%}
+.lc-facs{display:flex;flex-wrap:wrap;gap:6px}
+.lc-fac{font:500 11px var(--ui);color:var(--text2);background:var(--panel2);border:1px solid var(--border);
+  border-radius:6px;padding:3px 8px}
+.lc-fac b{color:var(--accent2)}
+.fac-row{display:flex;gap:9px;align-items:baseline;font:12px/1.5 var(--ui);color:var(--text2);
+  padding:3px 0;border-top:1px solid #21262d}
+.fac-row b{font:700 12px var(--mono);width:34px;flex-shrink:0;text-align:right}
+.fac-row .fac-name{font-weight:600;color:var(--text)}
+.fac-row .chip-r{color:var(--green);cursor:pointer;font:11px var(--mono)}
+
+/* generic list panels */
+.pad{padding:16px}
+.placeholder{text-align:center;padding:70px 20px;color:var(--muted)}
+.placeholder .pi{font-size:44px;margin-bottom:14px;opacity:.5}
+.placeholder h2{font:600 18px var(--ui);color:var(--text2);margin-bottom:8px}
+.placeholder p{max-width:440px;margin:0 auto;line-height:1.6}
+
+/* entity case-file tab */
+.casefir{border:1px solid var(--border);border-radius:8px;background:var(--panel2);
+  padding:11px 13px;margin-bottom:11px}
+.cf-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.cf-id{font:600 12px var(--mono);color:var(--accent2);cursor:pointer}
+.cf-id:hover{text-decoration:underline}
+.cf-meta{font:11px var(--mono);color:var(--muted);margin-left:auto}
+.cf-secs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.cf-sec{font:600 10px var(--mono);color:#f0883e;background:rgba(240,136,62,.12);
+  border:1px solid rgba(240,136,62,.35);border-radius:4px;padding:1px 7px}
+.cf-points{margin:0;padding-left:18px}
+.cf-points li{font:13px/1.55 var(--ui);color:var(--text2);margin-bottom:3px}
+.cf-points a{color:var(--accent2);cursor:pointer}
+.cf-flag{font:12px/1.5 var(--ui);color:var(--text2);background:rgba(210,153,34,.07);
+  border-left:3px solid var(--amber);padding:6px 9px;border-radius:0 5px 5px 0;margin-bottom:6px}
+.cf-moves{position:relative}
+.cf-move{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #21262d;
+  cursor:pointer}
+.cf-move:hover{background:var(--panel2)}
+.cf-dot{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-size:11px}
+.cf-date{font:600 11px var(--mono);color:var(--muted);width:74px;flex-shrink:0}
+.cf-sum{font:12.5px var(--ui);color:var(--text2)}
+
+/* evidence drawer */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:94vw;z-index:97;
+  background:var(--panel);border-left:1px solid var(--border2);display:flex;flex-direction:column;
+  box-shadow:-12px 0 40px rgba(0,0,0,.55);animation:dwIn .18s ease-out}
+#drawer[hidden]{display:none}
+@keyframes dwIn{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.dw-head{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border)}
+.dw-head h3{flex:1;font:600 15px var(--ui)}
+#dwBody{flex:1;overflow:auto;padding:16px 18px}
+.dw-sec{margin-bottom:16px}
+.dw-lbl{font:600 10px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;
+  margin-bottom:8px}
+.dw-txt{font:400 13px var(--ui);color:var(--text2);line-height:1.55}
+.dw-kv{display:flex;justify-content:space-between;gap:10px;font:12px var(--mono);color:var(--text2);
+  padding:5px 0;border-bottom:1px solid #21262d}
+.dw-kv span{color:var(--muted)}
+.confrow{display:flex;justify-content:space-between;gap:10px;font:11px var(--mono);color:var(--text2);
+  padding:4px 0;border-bottom:1px solid #21262d}
+.confrow b{color:var(--green)}.confrow.neg b{color:var(--red)}
+.dw-rec{border:1px solid var(--border);border-radius:7px;background:var(--panel2);padding:8px 10px;
+  margin-bottom:7px;cursor:pointer}
+.dw-rec:hover{border-color:var(--border2)}
+.dw-rec .rid{font:600 11px var(--mono);color:var(--accent2)}
+.dw-rec .rt{font:400 10px var(--mono);color:var(--muted);float:right}
+.dw-rec .rd{font:400 12px var(--ui);color:var(--text2);margin-top:3px;word-break:break-word}
+
+/* decision buttons */
+.decide{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.dbtn{font:600 11px var(--ui);padding:5px 11px;border-radius:6px;border:1px solid var(--border2);
+  background:var(--panel3);color:var(--text2)}
+.dbtn:hover{filter:brightness(1.15)}
+.dbtn.ok{border-color:#238636;color:#3fb950}
+.dbtn.no{border-color:#da3633;color:#f85149}
+.dbtn.rev{border-color:#9e6a03;color:#d29922}
+.verdict{display:inline-flex;align-items:center;gap:5px;font:600 10px var(--mono);letter-spacing:.04em;
+  padding:2px 8px;border-radius:11px;margin-left:6px}
+.verdict.VERIFIED,.verdict.CONFIRMED{color:#3fb950;background:rgba(63,185,80,.12);border:1px solid #238636}
+.verdict.DISMISSED,.verdict.REJECTED{color:#f85149;background:rgba(248,81,73,.12);border:1px solid #da3633}
+.verdict.NEEDS_REVIEW{color:#d29922;background:rgba(210,153,34,.12);border:1px solid #9e6a03}
+
+/* report overlay */
+#report{position:fixed;inset:0;z-index:100;background:#0d1117;overflow:auto}
+#report[hidden]{display:none}
+.rp-bar{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:12px 22px;
+  background:var(--panel);border-bottom:1px solid var(--border)}
+.rp-body{max-width:900px;margin:0 auto;padding:32px 40px 60px;background:#fff;color:#1a1a1a;
+  min-height:100%}
+.rp-body h1{font:700 24px var(--ui);margin-bottom:4px;color:#0d2b52}
+.rp-body .rp-meta{font:12px var(--mono);color:#555;margin-bottom:4px}
+.rp-body h2{font:600 15px var(--ui);color:#0d2b52;margin:24px 0 10px;padding-bottom:5px;
+  border-bottom:2px solid #0d2b52}
+.rp-body h3{font:600 13px var(--ui);margin:14px 0 6px;color:#222}
+.rp-body p,.rp-body li{font:13px/1.6 var(--ui);color:#333}
+.rp-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+.rp-body th,.rp-body td{border:1px solid #ccc;padding:6px 9px;text-align:left;vertical-align:top}
+.rp-body th{background:#eef2f7;font-weight:600}
+.rp-lead{border:1px solid #ccc;border-radius:6px;padding:10px 12px;margin-bottom:10px}
+.rp-lead .h{display:flex;justify-content:space-between;font-weight:600}
+.rp-disc{font:12px var(--ui);color:#7a5a00;background:#fff7e0;border-left:4px solid #d29922;
+  padding:8px 12px;margin:10px 0;line-height:1.5}
+.rp-emblem{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#1f6feb,#388bfd);
+  display:inline-flex;align-items:center;justify-content:center;font-size:18px;vertical-align:middle;margin-right:10px}
+@media print{
+  body>*{display:none!important}
+  #report{display:block!important;position:static;inset:auto}
+  #report .no-print{display:none!important}
+  .rp-body{max-width:none;margin:0;padding:0}
+}
+
+/* Ask PRAHARI assistant */
+#askFab{position:fixed;right:22px;bottom:22px;z-index:98;width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,#1f6feb,#388bfd);color:#fff;font-size:24px;
+  box-shadow:0 8px 24px rgba(31,111,235,.5);display:flex;align-items:center;justify-content:center}
+#askFab:hover{filter:brightness(1.1);transform:translateY(-1px)}
+#askPanel{position:fixed;right:22px;bottom:22px;z-index:98;width:390px;max-width:94vw;height:560px;
+  max-height:82vh;display:flex;flex-direction:column;background:var(--panel);
+  border:1px solid var(--border2);border-radius:14px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);animation:askIn .18s ease-out}
+#askPanel[hidden]{display:none}
+@keyframes askIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.ask-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,rgba(31,111,235,.14),transparent)}
+.ask-head b{font:600 14px var(--ui)}
+.ask-sub{font:400 10px var(--mono);color:var(--muted);margin-left:2px}
+.ask-head .icobtn{margin-left:auto}
+#askLog{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:88%;font:13px/1.5 var(--ui)}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;padding:8px 12px;border-radius:12px 12px 3px 12px}
+.msg.bot{align-self:flex-start;background:var(--panel3);border:1px solid var(--border);
+  padding:10px 12px;border-radius:12px 12px 12px 3px;width:100%}
+.msg.bot .b-title{font:600 13px var(--ui);color:var(--accent2);margin-bottom:3px}
+.msg.bot .b-sum{color:var(--text2);margin-bottom:7px}
+.msg.bot ul{margin:0;padding-left:16px}
+.msg.bot li{margin-bottom:5px;color:var(--text2)}
+.msg.bot li .chip-e{color:var(--accent2);cursor:pointer;text-decoration:underline dotted}
+.msg.bot li .chip-r{color:var(--green);cursor:pointer;font:11px var(--mono)}
+.b-disc{font:10px var(--ui);color:var(--muted);margin-top:8px;padding-top:7px;
+  border-top:1px dashed var(--border);line-height:1.45}
+.ask-ex{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ask-ex span{font:11px var(--ui);color:var(--accent2);border:1px solid var(--border2);
+  border-radius:12px;padding:3px 9px;cursor:pointer;background:var(--panel2)}
+.ask-ex span:hover{background:var(--panel3)}
+.ask-input{display:flex;gap:8px;padding:11px;border-top:1px solid var(--border)}
+.ask-input input{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);font:13px var(--ui);padding:9px 12px;outline:none}
+.ask-input input:focus{border-color:var(--accent)}
+.ask-input button{width:40px;border-radius:9px;background:var(--accent);color:#fff;font-size:15px}
+.ask-input button:hover{filter:brightness(1.1)}
+
+[role=button]:focus-visible,.navitem:focus-visible,.ent-tab:focus-visible{outline:2px solid var(--accent2);outline-offset:1px}
+
+/* toast */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:100;
+  background:var(--panel3);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;
+  font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;transition:.2s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* modal (Add Data) */
+.modal{position:fixed;inset:0;z-index:99;background:rgba(1,4,9,.7);display:flex;align-items:center;
+  justify-content:center;padding:20px}
+.modal[hidden]{display:none}
+.modal-panel{width:min(760px,96vw);max-height:88vh;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--border2);border-radius:12px;overflow:hidden}
+.modal-h{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border)}
+.modal-h h3{flex:1;font:600 15px var(--ui)}
+.modal-b{padding:16px 18px;overflow:auto}
+.modal-f{padding:11px 18px;border-top:1px solid var(--border);font:11px var(--ui);color:var(--muted);
+  line-height:1.5}
+.frow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+.frow label{display:flex;flex-direction:column;gap:4px;font:500 11px var(--ui);color:var(--muted);flex:1;
+  min-width:150px}
+.frow select,.frow input[type=file]{background:var(--panel2);border:1px solid var(--border);
+  border-radius:7px;color:var(--text);font:13px var(--ui);padding:7px 9px}
+#amPayload{width:100%;height:150px;background:#0b0f14;border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font:12px var(--mono);padding:10px 12px;resize:vertical;outline:none}
+#amPayload:focus{border-color:var(--accent)}
+.factions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:11px 0}
+.factions .chk{font:400 11px var(--ui);color:var(--muted);display:flex;align-items:center;gap:5px}
+.am-stat{font:600 11px var(--mono);padding:3px 9px;border-radius:5px;border:1px solid}
+.am-stat.ok{color:var(--green);border-color:var(--green);background:rgba(63,185,80,.1)}
+.am-stat.warn{color:var(--amber);border-color:var(--amber);background:rgba(210,153,34,.1)}
+.am-stat.bad{color:var(--red);border-color:var(--red);background:rgba(248,81,73,.1)}
+.am-stat.mut{color:var(--muted);border-color:var(--border2)}
+.am-rec{border:1px solid var(--border);border-radius:7px;background:var(--panel2);padding:8px 10px;
+  margin-bottom:7px}
+.am-rec-top{display:flex;align-items:center;gap:8px;font:600 12px var(--mono);flex-wrap:wrap}
+.am-fields{font:11px var(--mono);color:var(--text2);margin-top:5px;line-height:1.55;word-break:break-word}
+.am-fields .nul{color:var(--amber);font-style:italic}
+.am-issue{font:11px var(--mono);color:var(--amber);margin-top:4px}
+.am-conflict{font:11px var(--mono);color:var(--red);background:rgba(248,81,73,.09);
+  border-left:3px solid var(--red);padding:5px 8px;margin-top:5px;border-radius:0 5px 5px 0}
+.am-done{font:13px var(--ui);color:var(--green);background:rgba(63,185,80,.1);
+  border:1px solid rgba(63,185,80,.35);border-radius:8px;padding:11px 13px;line-height:1.5}
+
+/* crack overlay */
+#crack{position:fixed;left:calc(var(--sidebar) + 20px);bottom:22px;z-index:97;width:420px;
+  background:var(--panel);border:1px solid var(--border2);border-radius:12px;overflow:hidden;
+  box-shadow:0 16px 40px rgba(0,0,0,.6)}
+#crack[hidden]{display:none}
+.ck-h{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--border)}
+.ck-h .step{font:600 11px var(--mono);color:var(--accent2)}
+.ck-h h4{flex:1;font:600 14px var(--ui)}
+.ck-b{padding:14px 15px;font-size:13px;line-height:1.55;color:var(--text2)}
+.ck-b .src{display:block;margin-top:8px;font:400 11px var(--mono);color:var(--muted)}
+.ck-f{display:flex;gap:8px;padding:11px 15px;border-top:1px solid var(--border)}
+.ck-f button{padding:7px 14px;border-radius:7px;font:600 12px var(--ui);border:1px solid var(--border2);
+  background:var(--panel2);color:var(--text)}
+.ck-f .prim{background:var(--accent);border-color:var(--accent);color:#fff;flex:1}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="emblem">&#x1F6E1;</div>
+  <div class="brand"><b>PRAHARI</b><span>MHA &middot; NCRB &middot; SIH 2026</span></div>
+  <div class="casechip">
+    <div class="ct">Case: <span id="caseName">OP-SANGAM</span> <span class="badge">ACTIVE</span></div>
+    <div class="cs">Delhi &ndash; Mumbai Network</div>
+  </div>
+  <div id="gsearch">
+    <span class="ico">&#128269;</span>
+    <input id="gsearchInput" placeholder="Search person, phone, vehicle, account…" autocomplete="off">
+    <span class="kbd">Ctrl K</span>
+    <div id="gresults" class="hidden"></div>
+  </div>
+  <div class="topright">
+    <button class="icobtn" id="alertsBtn" title="Open findings needing review">&#128276;<span class="dot" id="notifCount" hidden>0</span></button>
+    <div class="user">
+      <div class="avatar">IO</div>
+      <div class="un" id="officerChip" title="Click to change the officer identity recorded in the audit log" style="cursor:pointer"><b id="officerName">Officer-101</b><span>Investigating Officer &middot; click to change</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div class="navitem on" data-view="overview"><span class="ni">&#128203;</span>Case Board</div>
+  <div class="navitem" data-view="entitysearch"><span class="ni">&#128269;</span>Entity Search</div>
+  <div class="navitem" data-view="ingestion"><span class="ni">&#128228;</span>Data Ingestion</div>
+  <div class="navitem" data-view="network"><span class="ni">&#128376;</span>Network Graph</div>
+  <div class="navitem" data-view="map"><span class="ni">&#128205;</span>Map &amp; Location</div>
+  <div class="navitem" data-view="timeline"><span class="ni">&#128337;</span>Timeline</div>
+  <div class="navitem" data-view="leads"><span class="ni">&#9878;</span>Investigative Leads</div>
+  <div class="navitem" data-view="documents"><span class="ni">&#128196;</span>Documents</div>
+  <div class="navitem" data-view="reports"><span class="ni">&#128202;</span>Reports</div>
+  <div class="navitem" data-view="audit"><span class="ni">&#128273;</span>Audit Log</div>
+  <div class="navspring"></div>
+  <div class="navitem" data-view="settings"><span class="ni">&#9881;</span>Settings</div>
+  <div class="sidefoot">
+    <div class="q">"Data connects what others overlook."</div>
+    <b>PRAHARI</b> &middot; Govt. of India (Demo)<br>v1.0.0
+  </div>
+</div>
+
+<!-- View tabs removed — navigation lives in the left sidebar. This bar now
+     holds only the case-wide action buttons. -->
+<div id="tabsbar">
+  <div id="viewTitle" class="viewtitle">Case Board</div>
+  <div class="tabspring"></div>
+  <button class="abtn blue" id="addDataBtn">&#65291; Add Data</button>
+  <button class="abtn ghost" id="reportBtn">&#128220; Generate Report</button>
+  <button class="abtn red" id="crackBtn">&#128302; Crack the Case</button>
+</div>
+
+<div id="main">
+  <!-- ===================== OVERVIEW ===================== -->
+  <div class="view on" id="view-overview">
+    <div class="stats" id="statStrip"></div>
+    <div class="ov-grid">
+      <div class="card graphwrap" id="graphCard">
+        <div class="graphtools">
+          <span class="card-h ci" style="border:0;padding:0;margin-right:4px">&#128376;</span>
+          <div class="gsrch"><input id="graphSearch" placeholder="Search in graph…"></div>
+          <select id="filterKind"><option value="">All Entities</option></select>
+          <select id="filterRel"><option value="">All Links</option></select>
+          <div class="tabspring"></div>
+          <div class="gwin" id="gwin">
+            <span data-window="all" class="on">All</span>
+            <span data-window="30d">30d</span>
+            <span data-window="7d">7d</span>
+            <span data-window="24h">24h</span>
+          </div>
+          <button class="gfull" id="graphExpand" title="Expand graph to full screen (Esc to exit)">&#9974; Full screen</button>
+        </div>
+        <div id="graph"></div>
+        <div class="glegend" id="glegend"></div>
+      </div>
+      <div class="card" id="entityCard">
+        <div id="entityPanel"><div class="ent-empty">Select a node on the graph to view its full profile, connections and evidence.</div></div>
+      </div>
+    </div>
+    <div class="ov-bottom">
+      <div class="card">
+        <div class="card-h"><span class="ci">&#128339;</span><h3>Recent Activity</h3></div>
+        <div class="wlist" id="activityList"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="ci">&#128337;</span><h3>Case Timeline</h3><span class="sub" id="tlSub"></span></div>
+        <div class="mtl"><div class="mtl-track" id="mtlTrack"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="ci">&#129504;</span><h3>Key Insights (algorithmic)</h3></div>
+        <div id="insightList"></div>
+        <div class="disc" style="margin:10px 14px 14px">Rule-based analytical summary (no language model). Requires investigator verification.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== NETWORK (full) ===================== -->
+  <div class="view" id="view-network">
+    <div class="ov-grid" style="grid-template-columns:1fr 360px">
+      <div class="card graphwrap">
+        <div class="card-h"><span class="ci">&#128376;</span><h3>Network Graph</h3>
+          <span class="sub">Full entity &amp; relationship view</span></div>
+        <div id="graph2" style="height:660px;background:radial-gradient(circle at 50% 40%,#11161d,#0d1117)"></div>
+      </div>
+      <div class="card"><div id="entityPanel2"><div class="ent-empty">Select a node to inspect.</div></div></div>
+    </div>
+  </div>
+
+  <!-- ===================== TIMELINE ===================== -->
+  <div class="view" id="view-timeline">
+    <div class="card"><div class="card-h"><span class="ci">&#128337;</span><h3>Case Timeline</h3>
+      <span class="sub" id="tlSub2"></span></div>
+      <div id="fullTimeline" class="pad"></div></div>
+  </div>
+
+  <!-- ===================== LEADS ===================== -->
+  <div class="view" id="view-leads">
+    <div class="card-h" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+      <span class="ci">&#9878;</span><h3>Investigative Lead Scores</h3>
+      <span class="sub">Triage ranking — not a determination of guilt. Every point is explained.</span></div>
+    <div id="leadsList"></div>
+  </div>
+
+  <!-- ===================== ENTITY RESOLUTION ===================== -->
+  <div class="view" id="view-entitysearch">
+    <div class="card-h" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+      <span class="ci">&#128269;</span><h3>Entity Resolution</h3>
+      <span class="sub">Candidate identity matches — nothing merged without investigator confirmation.</span></div>
+    <div id="erList"></div>
+  </div>
+
+  <!-- ===================== AUDIT ===================== -->
+  <div class="view" id="view-audit">
+    <div class="card"><div class="card-h"><span class="ci">&#128273;</span><h3>Blockchain Audit Log</h3>
+      <span class="sub" id="auditState"></span>
+      <button class="abtn ghost" id="tamperBtn" style="margin-left:auto">&#128274; Tamper Test</button></div>
+      <div id="auditList" class="pad"></div></div>
+  </div>
+
+  <!-- ===================== INGESTION ===================== -->
+  <div class="view" id="view-ingestion">
+    <div class="placeholder"><div class="pi">&#128228;</div><h2>Data Ingestion</h2>
+      <p>Use <b>Add Data</b> (top right) to ingest a new FIR, CDR, transfer, vehicle and more —
+      with validation, quality scoring and conflict detection before anything touches the graph.</p>
+      <button class="abtn blue" style="display:inline-flex;margin-top:16px" onclick="document.getElementById('addDataBtn').click()">&#65291; Open Add Data</button>
+    </div>
+  </div>
+
+  <!-- placeholders -->
+  <div class="view" id="view-map"><div class="placeholder"><div class="pi">&#128205;</div>
+    <h2>Map &amp; Location</h2><p>Simulated location intelligence and geo-fencing land in Phase 2.
+    CCTV/ANPR and GPS records can already be ingested and are stored, ready for this view.</p></div></div>
+  <div class="view" id="view-reports"><div class="placeholder"><div class="pi">&#128209;</div>
+    <h2>Case Report</h2><p>Generate a printable case brief — key entities, investigative leads with
+    their evidence, timeline, network summary and audit status. Every finding is citable to its
+    source records.</p>
+    <button class="abtn blue" style="display:inline-flex;margin-top:16px" onclick="document.getElementById('reportBtn').click()">&#128220; Generate Report</button>
+  </div></div>
+  <div class="view" id="view-documents"><div class="placeholder"><div class="pi">&#128196;</div>
+    <h2>Documents</h2><p>The 21 ingested FIR narratives and source files back every edge on the board.
+    A document browser is a Phase 2 addition.</p></div></div>
+  <div class="view" id="view-settings"><div class="placeholder"><div class="pi">&#9881;</div>
+    <h2>Settings</h2><p>Role-based access, thresholds and retention policy are documented in the
+    production architecture and land in Phase 2.</p></div></div>
+</div>
+
+<!-- Add Data modal -->
+<div class="modal" id="addModal" hidden>
+  <div class="modal-panel">
+    <div class="modal-h"><span class="ci">&#128228;</span><h3>Add Data to Case</h3>
+      <button class="icobtn" onclick="closeAddData()">&#10005;</button></div>
+    <div class="modal-b">
+      <div class="frow">
+        <label>Source<select id="amSource"></select></label>
+        <label>Input<select id="amFormat">
+          <option value="json">Paste JSON</option>
+          <option value="csv">Paste / upload CSV</option>
+          <option value="text">Raw FIR text</option></select></label>
+        <label>Upload file<input type="file" id="amFile" accept=".json,.csv,.txt"></label>
+      </div>
+      <textarea id="amPayload" spellcheck="false" placeholder="Paste a record, upload a file, or click Load example."></textarea>
+      <div class="factions">
+        <button class="abtn ghost" id="amExample" style="padding:6px 11px">Load example</button>
+        <label class="chk"><input type="checkbox" id="amConflicts"> add conflicting rows anyway (for review)</label>
+        <div class="tabspring"></div>
+        <button class="abtn ghost" id="amValidate">Validate &amp; preview</button>
+        <button class="abtn blue" id="amCommit" disabled>Add to case</button>
+      </div>
+      <div id="amResult"></div>
+    </div>
+    <div class="modal-f">Missing optional fields are kept as <b>null</b>, never invented. Malformed values are
+      held back. Conflicts are flagged for investigator review, never overwritten.</div>
+  </div>
+</div>
+
+<!-- Crack the Case overlay -->
+<div id="crack" hidden>
+  <div class="ck-h"><span class="step" id="ckStep">STEP 1 / 6</span><h4 id="ckTitle"></h4>
+    <button class="icobtn" onclick="endCrack()">&#10005;</button></div>
+  <div class="ck-b" id="ckBody"></div>
+  <div class="ck-f"><button id="ckPrev">&#9664; Back</button><button class="prim" id="ckNext">Next &#9654;</button></div>
+</div>
+
+<!-- Evidence drawer (slides in from the right) -->
+<div id="drawer" hidden>
+  <div class="dw-head"><h3 id="dwTitle">Evidence</h3>
+    <button class="icobtn" onclick="closeDrawer()">&#10005;</button></div>
+  <div id="dwBody"></div>
+</div>
+
+<!-- Report overlay (printable) -->
+<div id="report" hidden>
+  <div class="rp-bar no-print">
+    <b>Case Report</b><span class="tabspring" style="flex:1"></span>
+    <button class="abtn ghost" onclick="window.print()">&#128424; Print / Save PDF</button>
+    <button class="abtn ghost" onclick="closeReport()">&#10005; Close</button>
+  </div>
+  <div id="reportBody" class="rp-body"></div>
+</div>
+
+<!-- Ask PRAHARI — grounded assistant -->
+<button id="askFab" title="Ask PRAHARI">&#128172;</button>
+<div id="askPanel" hidden>
+  <div class="ask-head"><span class="ci">&#128172;</span><b>Ask PRAHARI</b>
+    <span class="ask-sub">grounded in case records · no external AI</span>
+    <button class="icobtn" onclick="closeAsk()">&#10005;</button></div>
+  <div id="askLog"></div>
+  <div class="ask-input">
+    <input id="askInput" placeholder="Ask about a person, a date, or a link…" autocomplete="off">
+    <button id="askSend" title="Send">&#10148;</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

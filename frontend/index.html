@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PRAHARI · Evidence Board · SIH 26189</title>
-<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="/static/vendor/vis-network.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Caveat:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -142,10 +142,7 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
 .chip[data-rel="co-accused"].on{background:var(--blue)}
 .chip[data-rel="jailed-together"].on{background:var(--violet)}
 
-/* ---------- legend card ---------- */
-#legendCard{pointer-events:auto;transform:rotate(.25deg)}
-.leg-inner{padding:9px 14px 11px}
-.leg-title{font:400 10px var(--type);letter-spacing:.16em;text-transform:uppercase;color:var(--faded);margin-bottom:7px}
+/* ---------- board key (drawn inside the Profile panel's default view) ---------- */
 .leg-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 4px}
 .leg-row{display:flex;align-items:center;gap:6px;font:10.5px var(--mono);color:var(--faded);padding:3px 0}
 .leg-circle{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1px solid rgba(0,0,0,.25)}
@@ -195,7 +192,7 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
 .lnk{color:#B9A67E;padding:0 3px}
 @keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
 
-/* ---------- PRIME SUSPECT stamp ---------- */
+/* ---------- investigative lead stamp ---------- */
 #lock{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;pointer-events:none}
 #lock.show{display:flex}
 #lock .frame{transform:rotate(-6deg);border:5px double var(--redink);padding:20px 40px;text-align:center;
@@ -212,6 +209,10 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:1100px){#intel{display:none}#rail{width:300px}}
 </style>
+<!-- Loaded AFTER the inline stylesheet on purpose: several rules override
+     same-specificity selectors above (#graph inset, #rail/#intel bottom,
+     #filters, .chip) and the later rule must win. -->
+<link rel="stylesheet" href="/static/phase1.css">
 </head>
 <body>
 
@@ -220,7 +221,7 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
     <div class="tab"></div>
     <span class="stamp">CONFIDENTIAL</span>
     <h1>CASE FILE &middot; OP-SANGAM</h1>
-    <div class="sub">PRAHARI &mdash; AI Criminal Network Analysis &middot; NCRB / Ministry of Home Affairs &middot; SIH 26189</div>
+    <div class="sub">PRAHARI &mdash; Investigative Intelligence &amp; Evidence Correlation &middot; NCRB / Ministry of Home Affairs &middot; SIH 26189</div>
     <div id="bootlog"></div>
   </div>
 </div>
@@ -231,13 +232,23 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
   <span id="statline">Loading intelligence&hellip;</span>
   <input id="search" placeholder="Search person ( press / )" aria-label="Search entity">
   <button class="primary" id="crackBtn" onclick="startCrack()"
-    title="6-step guided AI investigation: gang clusters &rarr; broker &rarr; money trail &rarr; kingpin &rarr; jail origin &rarr; anomaly spike">
+    title="6-step guided walkthrough: clusters &rarr; broker &rarr; money trail &rarr; network controller &rarr; custody origin &rarr; anomaly spike">
     &#x2A35; Crack the Case
   </button>
   <button class="danger" onclick="tamperDemo()"
     title="Demo: simulates a rogue admin editing a past audit record &mdash; SHA-256 blockchain catches it instantly">
     &#x1F512; Tamper Test
   </button>
+  <button id="addDataBtn" title="Ingest a new FIR, CDR, transfer, vehicle and more — validate, preview, resolve conflicts, then add to the case">
+    &#x2795; Add Data
+  </button>
+  <div id="windowPicker" title="Filter the board by observation window. Relative windows are anchored to the latest record in the case, not to today's date.">
+    <span class="wl">WINDOW</span>
+    <span class="win on" data-window="all">All</span>
+    <span class="win" data-window="30d">30d</span>
+    <span class="win" data-window="7d">7d</span>
+    <span class="win" data-window="24h">24h</span>
+  </div>
 </header>
 
 <div class="lamp" id="lampA"></div><div class="lamp" id="lampB"></div>
@@ -266,50 +277,137 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
 <div id="intel">
 
   <!-- Filter chips -->
+  <!-- The chips ARE the string legend: each carries its colour and a glyph.
+       Solid = interaction · dotted = registry attachment · dashed = shared custody. -->
   <div class="card" id="filterCard">
-    <span class="filter-label">Show connection types on board</span>
+    <span class="filter-label">Strings on board</span>
     <div id="filters">
-      <span class="chip on" data-rel="calls"          title="Phone call records (CDR)">&#128222; Calls</span>
-      <span class="chip on" data-rel="money"          title="Bank transfer records (FIU-IND)">&#128176; Money</span>
-      <span class="chip on" data-rel="co-accused"     title="Named together in same FIR (CCTNS)">&#9878; Co-accused</span>
-      <span class="chip on" data-rel="jailed-together" title="Shared a cell block (e-Prisons)">&#128279; Jail link</span>
+      <span class="chip on" data-rel="calls"           title="Call detail records — communication metadata (solid red)">&#128222; Calls</span>
+      <span class="chip on" data-rel="money"           title="Bank transfers (solid amber)">&#128176; Money</span>
+      <span class="chip on" data-rel="co-accused"      title="Named together in one FIR (solid blue)">&#9878; Co-accused</span>
+      <span class="chip on" data-rel="jailed-together" title="Overlapping custody in one cell block — proximity, not association (dashed violet)">&#128279; Custody</span>
+      <span class="chip on" data-rel="registered-to"   title="Vehicle registration, VAHAN (dotted grey)">&#128663; Vehicle</span>
+      <span class="chip on" data-rel="phone-linked"    title="Handset tied to a subscriber via the telecom registry (dotted green)">&#128242; Handset</span>
     </div>
   </div>
 
-  <!-- Board legend -->
-  <div class="card" id="legendCard">
-    <div class="leg-inner">
-      <div class="leg-title">Board Legend</div>
-      <div class="leg-grid">
-        <div class="leg-row"><div class="leg-circle" style="background:#5A5A5A"></div>Person / suspect</div>
-        <div class="leg-row"><div class="leg-circle" style="background:#F7E27A;border-color:#8A7A1E"></div>Burner phone</div>
-        <div class="leg-row"><div class="leg-sq" style="background:#D9B877;border-color:#A8874C"></div>Shell company</div>
-        <div class="leg-row"><div class="leg-circle" style="background:#A02818"></div>Prime suspect</div>
-        <div class="leg-row"><div class="leg-line" style="background:#C0392B"></div>Calls (CDR)</div>
-        <div class="leg-row"><div class="leg-line" style="background:#B87E1F"></div>Money (FIU)</div>
-        <div class="leg-row"><div class="leg-line" style="background:#2F5FA8"></div>Co-accused (FIR)</div>
-        <div class="leg-row"><div class="leg-dash" style="border-color:#7C5CBF"></div>Jail link</div>
-      </div>
+  <!-- Panel tabs: Profile / Leads / Identity -->
+  <div class="card" id="panelCard">
+    <div class="ptabs">
+      <span class="ptab on" data-panel="dossierCard" title="Entity profile for the selected photograph">&#128193; Profile</span>
+      <span class="ptab" data-panel="leadsCard" title="Ranked investigative leads with score breakdown">&#9878; Leads</span>
+      <span class="ptab" data-panel="erCard" title="Candidate identity matches awaiting investigator confirmation">&#128270; Identity</span>
     </div>
+  </div>
+
+  <!-- Investigative leads -->
+  <div class="card panel" id="leadsCard" hidden>
+    <div class="hd"><h3>&#9878; Investigative Lead Scores</h3></div>
+    <div id="leadsBody"></div>
+  </div>
+
+  <!-- Entity resolution -->
+  <div class="card panel" id="erCard" hidden>
+    <div class="hd"><h3>&#128270; Entity Resolution</h3></div>
+    <div id="erBody"></div>
   </div>
 
   <!-- Entity dossier -->
-  <div class="card" id="dossierCard">
+  <div class="card panel" id="dossierCard">
     <div class="hd"><h3>&#128193; Case File &mdash; Entity Profile</h3></div>
     <div id="dossier">
       <div class="empty">
         <div class="how-h">How to use this board</div>
-        <div class="how-step">&#9312; <strong>Click any photo</strong> on the board to open their criminal profile here</div>
+        <div class="how-step">&#9312; <strong>Click any photo</strong> on the board to open that entity’s profile here</div>
         <div class="how-step">&#9313; <strong>Filter chips</strong> above toggle which connection types are visible</div>
         <div class="how-step">&#9314; <strong>&#x2A35; Crack the Case</strong> &mdash; 6-step guided AI investigation walkthrough</div>
         <div class="how-step">&#9315; <strong>&#x1F512; Tamper Test</strong> &mdash; live blockchain audit integrity demo</div>
         <div class="how-step">&#9316; <strong>Search ( press / )</strong> &mdash; instantly fly the camera to any person</div>
+        <!-- Board key lives here rather than in its own card: this block is what a
+             judge sees first, and it costs nothing once a profile is open. The
+             string colours are the chips above; only node shapes need explaining. -->
+        <div class="key">
+          <div class="key-h">Board key</div>
+          <div class="leg-grid">
+            <div class="leg-row"><div class="leg-circle" style="background:#5A5A5A"></div>Person / entity</div>
+            <div class="leg-row"><div class="leg-circle" style="background:#A02818"></div>Investigative lead</div>
+            <div class="leg-row"><div class="leg-circle" style="background:#F7E27A;border-color:#8A7A1E"></div>Unresolved number</div>
+            <div class="leg-row"><div class="leg-sq" style="background:#D9B877;border-color:#A8874C"></div>Corporate entity</div>
+            <div class="leg-row"><div class="leg-sq" style="background:#ECEFE8;border-color:#3A3A3A"></div>Vehicle (VAHAN)</div>
+          </div>
+          <div class="key-note">Strings: <b>solid</b> interaction &middot; <b>dotted</b> registry link &middot; <b>dashed</b> shared custody. Colours match the chips above.</div>
+        </div>
         <div class="sources">
           Data sources ingested:<br>
-          CCTNS (FIRs) &middot; CDR (call records) &middot; FIU-IND (bank) &middot; e-Prisons &middot; VAHAN (vehicles)
+          CCTNS (FIRs) &middot; CDR (call records) &middot; FIU-IND (bank) &middot; e-Prisons &middot; VAHAN (vehicles) &middot; travel manifests
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Case timeline -->
+<div id="timeline">
+  <div class="tl-head">
+    <span class="tl-title">CASE TIMELINE</span>
+    <span id="tlWindow" class="tl-window"></span>
+    <span class="tl-legend">
+      <i class="tk t-FIR"></i>FIR
+      <i class="tk t-CALL_ACTIVITY"></i>Calls
+      <i class="tk t-TRANSACTION"></i>Transfer
+      <i class="tk t-TRAVEL"></i>Travel
+      <i class="tk t-CUSTODY_OVERLAP"></i>Custody
+    </span>
+  </div>
+  <div id="tlTrack"></div>
+</div>
+
+<!-- Evidence drawer -->
+<div id="drawer" hidden>
+  <div class="dw-head">
+    <h3 id="dwTitle">Evidence</h3>
+    <button class="sm-btn" onclick="closeDrawer()" title="Close">&#x2715;</button>
+  </div>
+  <div id="dwBody"></div>
+</div>
+
+<!-- ADD DATA modal: validate -> preview -> conflicts -> add -->
+<div id="addModal" hidden>
+  <div class="am-panel">
+    <div class="am-head">
+      <h3>&#x2795; Add Data to Case</h3>
+      <button class="sm-btn" onclick="closeAddData()" title="Close">&#x2715;</button>
+    </div>
+    <div class="am-body">
+      <div class="am-row">
+        <label>Source
+          <select id="amSource"></select>
+        </label>
+        <label>Input
+          <select id="amFormat">
+            <option value="json">Paste JSON</option>
+            <option value="csv">Paste / upload CSV</option>
+            <option value="text">Raw FIR text</option>
+          </select>
+        </label>
+        <label class="am-file">Upload file
+          <input type="file" id="amFile" accept=".json,.csv,.txt">
+        </label>
+      </div>
+      <textarea id="amPayload" spellcheck="false"
+        placeholder="Paste a record here, or pick a file above. Click 'Load example' to see the format."></textarea>
+      <div class="am-actions">
+        <button class="sm-btn" id="amExample" type="button">Load example</button>
+        <label class="am-chk"><input type="checkbox" id="amConflicts"> add conflicting rows anyway (for review)</label>
+        <span style="flex:1"></span>
+        <button id="amValidate" type="button">Validate &amp; preview</button>
+        <button class="primary" id="amCommit" type="button" disabled>Add to case</button>
+      </div>
+      <div id="amResult"></div>
+    </div>
+    <div class="am-foot">Records are validated first. Missing optional fields are kept as
+      <b>null</b>, never invented. Malformed values are held back. Conflicts are flagged for
+      investigator review, never overwritten.</div>
   </div>
 </div>
 
@@ -319,9 +417,9 @@ h3{font:400 13px var(--type);letter-spacing:.14em;text-transform:uppercase;color
   <div id="blocks"></div>
 </div>
 
-<!-- Prime suspect stamp overlay -->
+<!-- Investigative lead stamp overlay -->
 <div id="lock"><div class="frame">
-  <div class="t">&#9733; PRIME SUSPECT &#9733;</div>
+  <div class="t">&#9733; INVESTIGATIVE LEAD &#9733;</div>
   <div class="n" id="lockName"></div>
   <div class="d" id="lockDetail"></div>
 </div></div>
@@ -335,6 +433,8 @@ const C={red:"#C0392B",redink:"#A02818",amber:"#B87E1F",violet:"#7C5CBF",
 let DATA=null,network=null,nodesDS=null,edgesDS=null,roles={},META={},DIM=null;
 let crack={on:false,step:-1};
 const $=id=>document.getElementById(id);
+/* every value from the API must pass through esc() before innerHTML — intake accepts free text */
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const anim=reduceMotion?false:{duration:900,easingFunction:"easeInOutQuad"};
 const rand=s=>{let x=Math.sin(s*9973)*10000;return x-Math.floor(x);};
@@ -346,35 +446,38 @@ async function boot(){
   say("PRAHARI v3 \u2014 case file opened","ok");
   say("Connecting to: CCTNS \u00b7 CDR \u00b7 FIU-IND \u00b7 e-Prisons \u00b7 VAHAN \u2026");
   const t0=performance.now();
-  const r=await fetch(`/api/graph?officer=Officer-${100+Math.floor(Math.random()*9)}`);
+  const OFFICER=(()=>{try{return localStorage.getItem("prahari.officer")||"Officer-101";}catch(e){return "Officer-101";}})();
+  const r=await fetch(`/api/graph?officer=${encodeURIComponent(OFFICER)}`);
   DATA=await r.json();
   const ms=Math.round(performance.now()-t0);
   say(`\u2714  Parsed ${DATA.stats.firs_parsed} FIRs across Delhi &amp; Mumbai police districts`,"ok");
   say(`\u2714  Cross-linked CDR \u00b7 bank transactions \u00b7 prison rosters \u00b7 travel manifests`,"ok");
   for(const n of DATA.nodes.filter(x=>x.kind!=="person").slice(0,3))
     say(`\u26a0  Unresolved entity: ${n.id} [${n.kind.replace("_"," ")}]`,"warn");
-  say(`\u2714  ${DATA.stats.people} suspects identified \u2014 printing photographs to board`,"ent");
-  say(`\u2714  Stringing connections: ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} gang clusters`,"ok");
+  say(`\u2714  ${DATA.stats.people} entities identified \u2014 printing photographs to board`,"ent");
+  say(`\u2714  Stringing connections: ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} clusters`,"ok");
   say(`\u2714  AI analysis complete in ${ms}\u202fms \u2014 board is live`,"ent");
   deriveRoles(); buildMeta();
   try{await document.fonts.ready;}catch(e){}
   buildGraph(); baseLog(); loadAudit();
   /* populate live stats bar */
   $("statline").textContent=
-    `${DATA.stats.people} suspects \u00b7 ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} clusters \u00b7 ${DATA.stats.firs_parsed} FIRs`;
+    `${DATA.stats.people} entities \u00b7 ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} clusters \u00b7 ${DATA.stats.firs_parsed} FIRs`;
   setTimeout(()=>$("boot").classList.add("gone"),reduceMotion?100:1100);
 }
 
 /* ================= roles (derived live \u2014 nothing hardcoded) ================= */
 function deriveRoles(){
   const persons=DATA.nodes.filter(n=>n.kind==="person");
-  roles.burner=(DATA.nodes.find(n=>n.kind==="burner_phone")||{}).id;
+  roles.burner=(DATA.nodes.find(n=>n.kind==="unresolved_number")||{}).id;
   roles.shell=(DATA.nodes.find(n=>n.kind==="shell_company")||{}).id;
-  const shellEdges=DATA.edges.filter(e=>e.money_inr&&(e.from===roles.shell||e.to===roles.shell));
-  const kp=shellEdges.map(e=>e.from===roles.shell?e.to:e.from)
-    .map(id=>DATA.nodes.find(n=>n.id===id)).filter(n=>n&&n.kind==="person")
-    .sort((a,b)=>b.betweenness-a.betweenness)[0];  /* highest betweenness = most central node */
+  /* Kingpin = the hidden head: biggest NET money inflow among people named in no FIR.
+     Same rule the backend uses for its HIDDEN KINGPIN brief, so board and brief agree.
+     Ranking by centrality instead surfaces a leader who is already charged in a FIR. */
+  const netIn=n=>(n.money_in||0)-(n.money_out||0);
+  const kp=persons.filter(n=>!n.in_fir&&netIn(n)>0).sort((a,b)=>netIn(b)-netIn(a))[0];
   roles.kingpin=kp?kp.id:null;
+  roles.kingpinNetIn=kp?netIn(kp):0;
   const byComm={};
   persons.filter(p=>p.id!==roles.kingpin).forEach(p=>{
     if(!byComm[p.community]||p.pagerank>byComm[p.community].pagerank)byComm[p.community]=p;});
@@ -435,12 +538,12 @@ function rendererFor(id){
         ctx.save();ctx.translate(x,y);ctx.rotate(rot);
         ctx.globalAlpha=dim?.22:1;
         ctx.shadowColor="rgba(20,10,4,.5)";ctx.shadowBlur=10;ctx.shadowOffsetY=5;
-        if(m.kind==="burner_phone"){
+        if(m.kind==="unresolved_number"){
           w=104;h=78;
           ctx.fillStyle="#F7E27A";ctx.fillRect(-w/2,-h/2,w,h);
           ctx.shadowColor="transparent";
           ctx.fillStyle="#8A7A1E";ctx.font="400 10px 'Special Elite',monospace";
-          ctx.textAlign="center";ctx.fillText("burner?",0,-h/2+16);
+          ctx.textAlign="center";ctx.fillText("unresolved",0,-h/2+16);
           ctx.fillStyle="#2B2620";ctx.font="700 13px 'IBM Plex Mono',monospace";
           ctx.fillText(m.id,0,2);
           ctx.strokeStyle="#C0392B";ctx.lineWidth=2;
@@ -457,11 +560,27 @@ function rendererFor(id){
           ctx.strokeStyle="#A8874C";ctx.lineWidth=1.5;ctx.stroke();
           ctx.fillStyle="#F5EFE0";ctx.beginPath();ctx.arc(-w/2+12,0,4,0,7);ctx.fill();ctx.stroke();
           ctx.fillStyle="#5C4A2E";ctx.font="400 9px 'Special Elite',monospace";
-          ctx.textAlign="center";ctx.fillText("EVIDENCE \u00b7 SHELL CO.",8,-8);
+          ctx.textAlign="center";ctx.fillText("EVIDENCE \u00b7 CORPORATE",8,-8);
           ctx.fillStyle="#2B2620";ctx.font="700 14px 'Caveat',cursive";
           const nm=m.id.length>20?m.id.slice(0,19)+"\u2026":m.id;
           ctx.fillText(nm,8,10);
           drawPin(ctx,8,-h/2+4,"#8E1F12");
+        }else if(m.kind==="vehicle"){
+          /* VAHAN registration: a number plate, not a mugshot. Vehicles were
+             ingested but never drawn before, so they used to fall through to
+             the person renderer and appear on the board as people. */
+          w=104;h=46;
+          ctx.fillStyle="#ECEFE8";ctx.fillRect(-w/2,-h/2,w,h);
+          ctx.shadowColor="transparent";
+          ctx.strokeStyle="#3A3A3A";ctx.lineWidth=2;ctx.strokeRect(-w/2,-h/2,w,h);
+          ctx.strokeStyle="#8A8A8A";ctx.lineWidth=1;
+          ctx.strokeRect(-w/2+3,-h/2+3,w-6,h-6);
+          ctx.fillStyle="#1B1B1B";ctx.font="700 13px 'IBM Plex Mono',monospace";
+          ctx.textAlign="center";ctx.fillText(m.id,0,-1);
+          ctx.fillStyle="#5A5A5A";ctx.font="400 8px 'Special Elite',monospace";
+          const vt=(m.vehicle_type||"vehicle");
+          ctx.fillText(vt.length>22?vt.slice(0,21)+"…":vt,0,12);
+          drawPin(ctx,0,-h/2+4,"#4A4038");
         }else{
           w=84;h=104;
           ctx.fillStyle="#FAF7EE";ctx.fillRect(-w/2,-h/2,w,h);
@@ -472,12 +591,12 @@ function rendererFor(id){
           ctx.fillText(nm,0,h/2-(m.leader?17:9));
           if(m.leader){ctx.fillStyle=m.gang===0?"#2F5FA8":"#2F7D4F";
             ctx.font="400 8.5px 'Special Elite',monospace";
-            ctx.fillText(m.gang===0?"CELL A \u2014 LEADER":"CELL B \u2014 LEADER",0,h/2-6);}
+            ctx.fillText(m.gang===0?"CLUSTER A \u2014 CENTRAL":"CLUSTER B \u2014 CENTRAL",0,h/2-6);}
           if(m.prime&&!dim){
             ctx.save();ctx.rotate(-.18);ctx.strokeStyle="rgba(160,40,24,.9)";ctx.lineWidth=2;
             ctx.strokeRect(-34,-14,68,22);
             ctx.fillStyle="rgba(160,40,24,.9)";ctx.font="700 11px 'Special Elite',monospace";
-            ctx.fillText("PRIME SUSPECT",0,2);ctx.restore();}
+            ctx.fillText("LEAD · REVIEW",0,2);ctx.restore();}
           drawPin(ctx,0,-h/2+4,m.gang===0?"#2F5FA8":m.gang===1?"#2F7D4F":"#8E1F12");
         }
         if(sel&&!dim)markerRing(ctx,0,0,w/2+10,h/2+8);
@@ -491,21 +610,34 @@ function rendererFor(id){
 
 /* ================= edge styles ================= */
 function edgeStyle(e){
+  /* One visual grammar, matching the chips exactly:
+       solid  = interaction (calls red, money amber, co-accused blue)
+       dashed = shared custody (violet) — proximity, not association
+       dotted = registry attachment (vehicle grey, handset green)
+     Co-accused used to draw brown while the chip and legend both said blue. */
+  const registry=e.rel==="registered-to"||e.rel==="phone-linked";
   const col=e.rel==="money"?C.amber:e.rel==="jailed-together"?C.violet
-        :e.rel==="co-accused"?"#7A4A3A":C.red;
-  return {color:{color:col,highlight:C.redink,opacity:.9},
-    width:e.money_inr?3:e.calls?Math.min(1.4+e.calls/5,3.2):1.6,
-    dashes:e.rel==="jailed-together"?[7,7]:false,
+        :e.rel==="co-accused"?C.blue:e.rel==="registered-to"?C.faded
+        :e.rel==="phone-linked"?C.green:C.red;
+  return {color:{color:col,highlight:C.redink,opacity:registry?.75:.9},
+    width:e.money_inr?3:registry?1.3:e.calls?Math.min(1.4+e.calls/5,3.2):1.6,
+    dashes:e.rel==="jailed-together"?[7,7]:registry?[2,5]:false,
     smooth:{type:"continuous",roundness:.18},
     shadow:{enabled:true,color:"rgba(40,15,5,.35)",size:3,y:2}};
 }
 
 /* ================= build board ================= */
 function buildGraph(){
+  /* Hover title explains the node type in place, so the board no longer needs
+     a standing legend card to be readable. */
+  const KIND_TITLE={person:"Person / entity",unresolved_number:"Unresolved number — no registered subscriber",
+    shell_company:"Corporate entity",vehicle:"Vehicle registration (VAHAN)",account:"Unmapped account"};
   nodesDS=new vis.DataSet(DATA.nodes.map(n=>({id:n.id,shape:"custom",
+    title:n.id===roles.kingpin?"Potential Network Controller — investigative lead":(KIND_TITLE[n.kind]||n.kind),
     ctxRenderer:rendererFor(n.id)})));
   edgesDS=new vis.DataSet(DATA.edges.map((e,i)=>({id:"e"+i,from:e.from,to:e.to,
-    ...edgeStyle(e),_rel:e.rel,_money:e.money_inr,_calls:e.calls,_src:e.source})));
+    ...edgeStyle(e),_rel:e.rel,_rels:e.rel_types||[e.rel],_money:e.money_inr,
+    _calls:e.calls,_src:e.source,_conf:e.confidence})));
   network=new vis.Network($("graph"),{nodes:nodesDS,edges:edgesDS},{
     physics:{barnesHut:{gravitationalConstant:-9000,springLength:190,springConstant:.02,
       avoidOverlap:.6},stabilization:{iterations:260}},
@@ -526,15 +658,15 @@ const REL_LABEL={
 function openDossier(id){
   const n=DATA.nodes.find(x=>x.id===id);if(!n)return;
   const ev=DATA.edges.filter(e=>e.from===id||e.to===id);
-  const col=n.kind==="burner_phone"?C.redink:n.kind==="shell_company"?C.amber:
+  const col=n.kind==="unresolved_number"?C.redink:n.kind==="shell_company"?C.amber:
             id===roles.kingpin?C.redink:C.blue;
-  const lbl=id===roles.kingpin?"\u2605 PRIME SUSPECT":n.kind.replace(/_/g," ").toUpperCase();
+  const lbl=id===roles.kingpin?"\u2605 POTENTIAL NETWORK CONTROLLER":n.kind.replace(/_/g," ").toUpperCase();
   $("dossier").innerHTML=`
-    <div class="dname">${n.label}</div>
+    <div class="dname">${esc(n.label)}</div>
     <span class="dkind" style="color:${col};border-color:${col}">${lbl}</span>
     <div class="metric"><span>PageRank \u2014 influence score</span><b>${n.pagerank}</b></div>
     <div class="metric"><span>Betweenness \u2014 broker score</span><b>${n.betweenness}</b></div>
-    <div class="metric"><span>Gang / cluster</span><b>#${n.community}</b></div>
+    <div class="metric"><span>Cluster</span><b>#${n.community}</b></div>
     <div class="metric"><span>Evidence links on board</span><b>${ev.length}</b></div>
     <div class="dossier-h">Evidence on the board</div>
     ${ev.map(e=>{
@@ -545,7 +677,7 @@ function openDossier(id){
         ?`${e.calls} phone calls recorded`
         :(REL_LABEL[e.rel]||e.rel);
       const src=e.source?`source: ${e.source}`:(REL_LABEL[e.rel]||e.rel);
-      return `<div class="ev"><b>${other}</b> \u2014 ${what}<span>${src}</span></div>`;
+      return `<div class="ev"><b>${esc(other)}</b> \u2014 ${esc(what)}<span>${esc(src)}</span></div>`;
     }).join("")}`;
 }
 
@@ -553,7 +685,14 @@ function openDossier(id){
 document.querySelectorAll(".chip").forEach(ch=>ch.onclick=()=>{ch.classList.toggle("on");applyFilters();});
 function applyFilters(){
   const on=[...document.querySelectorAll(".chip.on")].map(c=>c.dataset.rel);
-  edgesDS.forEach(e=>edgesDS.update({id:e.id,hidden:!on.includes(e._rel)&&!!e._rel}));
+  /* One edge can carry several relations at once — a pair can be tied by a
+     transfer AND a call history. Such an edge shows under either chip, so
+     filtering by "Calls" no longer hides links that are also transfers. */
+  edgesDS.forEach(e=>{
+    const rels=e._rels&&e._rels.length?e._rels:[e._rel];
+    const visible=!e._rel||rels.some(r=>on.includes(r));
+    edgesDS.update({id:e.id,hidden:!visible});
+  });
 }
 $("search").addEventListener("keydown",ev=>{
   if(ev.key!=="Enter")return;
@@ -575,7 +714,7 @@ function logEntry(tag,color,text,src){
 function baseLog(){
   logEntry("BOARD READY","cyan",
     `${DATA.stats.people} photographs pinned \u00b7 ${DATA.stats.edges} strings attached \u00b7 `+
-    `${DATA.stats.communities} gang clusters found. `+
+    `${DATA.stats.communities} clusters found. `+
     `Press <b style="font-family:inherit;letter-spacing:.06em">\u2a35 Crack the Case</b> to walk the board step by step.`);
 }
 function clearLog(){
@@ -599,46 +738,58 @@ function members(comm){return DATA.nodes.filter(n=>n.community===comm&&n.kind===
 /* ================= CRACK THE CASE \u2014 6-step guided walkthrough ================= */
 const steps=()=>[
  {tag:"STEP 1 \u00b7 TWO CELLS",color:"blue",
-  text:`Grouping the photographs: two organised crime cells emerge from the noise \u2014 `+
-       `Cell A around <strong>${roles.leaders[0]}</strong>, `+
-       `Cell B around <strong>${roles.leaders[1]}</strong>.`,
-  src:"algorithm: Louvain community detection",
+  text:`Grouping the photographs: two interaction clusters separate out of the noise \u2014 `+
+       `Cluster A centred on <strong>${roles.leaders[0]}</strong>, `+
+       `Cluster B on <strong>${roles.leaders[1]}</strong>. Clusters are statistical \u2014 not established groups.`,
+  src:"algorithm: greedy modularity community detection",
   act(){const ids=[...members(roles.gangComms[0]),...members(roles.gangComms[1])];
     dimExcept(ids);focusOn(ids);}},
  {tag:"STEP 2 \u00b7 THE BROKER",color:"red",
-  text:`The yellow sticky: unregistered burner <strong>${roles.burner}</strong> calls leaders `+
-       `of BOTH cells. No subscriber identity \u2014 highest cross-cell traffic on the board.`,
+  text:`The yellow sticky: unresolved number <strong>${roles.burner}</strong> calls the most central `+
+       `entities in BOTH clusters. No subscriber is registered to it, so the handset \u2014 `+
+       `holder is not established by these records.`,
   src:`evidence: CDR \u2014 device ${roles.burner}`,
   act(){const ids=[roles.burner,...roles.leaders];dimExcept(ids);focusOn(ids);}},
  {tag:"STEP 3 \u00b7 FOLLOW THE MONEY",color:"amber",
   text:`Both leaders wire funds to the same shell company \u2014 `+
        `<strong>${roles.shell}</strong>. `+
-       `Many sources in, one consolidated payout out: textbook money layering.`,
+       `Many sources in, one consolidated payout out \u2014 the movement pattern `+
+       `associated with layering. Consolidation is also ordinary commerce.`,
   src:"evidence: FIU-IND transaction records",
   act(){const ids=[roles.shell,...roles.leaders,roles.kingpin];dimExcept(ids);focusOn(ids);}},
- {tag:"STEP 4 \u00b7 PRIME SUSPECT",color:"red",
+ {tag:"STEP 4 \u00b7 NETWORK CONTROLLER",color:"red",
   text:`Money exits to <strong>${roles.kingpin}</strong> \u2014 a face on the board named in `+
-       `<strong>ZERO FIRs</strong>. Financially central, operationally invisible. `+
-       `PRAHARI stamps him PRIME SUSPECT.`,
+       `<strong>ZERO FIRs</strong> in this corpus \u2014 financially central, absent `+
+       `from the case record. PRAHARI flags this as an investigative lead for `+
+       `review, not a finding of involvement.`,
   src:"heuristic: money-in \u2191 \u00b7 FIR mentions = 0",
   act(){dimExcept([roles.kingpin,roles.shell]);focusOn([roles.kingpin]);
     $("lockName").textContent=roles.kingpin;
-    $("lockDetail").textContent="net inflow \u20b97,00,000 \u00b7 FIR mentions: 0 \u00b7 via "+roles.shell;
+    $("lockDetail").textContent="net inflow ₹"+roles.kingpinNetIn.toLocaleString("en-IN")+" · FIR mentions: 0 · via "+roles.shell;
     $("lock").classList.add("show");
     setTimeout(()=>$("lock").classList.remove("show"),reduceMotion?600:2600);}},
  {tag:"STEP 5 \u00b7 WHERE IT BEGAN",color:"violet",
   text:`Dashed purple string: both cell leaders overlapped at `+
        `<strong>${roles.jailEdge?roles.jailEdge.source:"the same cell block"}</strong> in 2022. `+
-       `The criminal alliance was forged inside prison.`,
+       `Shared custody establishes proximity, not association \u2014 and it `+
+       `predates the case window by four years.`,
   src:"evidence: e-Prisons inmate roster",
   act(){dimExcept(roles.leaders);focusOn(roles.leaders);}},
  {tag:"STEP 6 \u00b7 THE TELL",color:"cyan",
-  text:DATA&&DATA.anomalies.length
-    ?`Burst detection: <strong>${DATA.anomalies[0].pair}</strong> spiked to `+
-     `<strong>${DATA.anomalies[0].calls_that_day} calls</strong> on ${DATA.anomalies[0].date} \u2014 `+
-     `48 hours before the Mundra seizure. In production this fires a real-time alert.`
-    :"No call-burst anomalies detected in the current window.",
-  src:"algorithm: per-pair burst detection",
+  /* Derived entirely from the anomaly engine. The previous copy asserted the
+     spike fell "48 hours before the Mundra seizure"; the records place it nine
+     days AFTER FIR_021, so the claim is gone and the real ratio is shown. */
+  text:(()=>{
+    const sp=(DATA&&DATA.call_spikes&&DATA.call_spikes[0])||null;
+    if(!sp)return "No call-volume anomalies exceeded baseline in the current window.";
+    const b=sp.baseline||{};
+    return `Burst detection: <strong>${sp.pair}</strong> reached `+
+      `<strong>${sp.calls_that_day} calls</strong> on ${sp.date} \u2014 `+
+      `<strong>${b.ratio}\u00d7</strong> this pair\u2019s median active day of `+
+      `${b.baseline}. Rated ${sp.severity} at ${sp.confidence}% confidence. `+
+      `A deviation is a lead to examine, not proof of an offence.`;
+  })(),
+  src:"algorithm: per-pair daily volume vs pair-specific median baseline",
   act(){const ids=[roles.burner,...roles.leaders];dimExcept(ids);focusOn(ids);}},
 ];
 
@@ -685,7 +836,7 @@ async function loadAudit(){
   $("chain").classList.toggle("broken",!d.chain_valid);
   $("chainState").textContent=d.chain_valid?"\u25cf SEALED":"\u2715 BROKEN @ block "+d.tampered_block;
   $("blocks").innerHTML=d.blocks.slice(-6).map(b=>
-    `<span class="blk">#${b.index} ${b.officer} <i>${b.hash.slice(0,10)}</i></span>`)
+    `<span class="blk">#${esc(b.index)} ${esc(b.officer)} <i>${esc(String(b.hash||"").slice(0,10))}</i></span>`)
     .join(`<span class="lnk">\u2500\u2500</span>`);
 }
 async function tamperDemo(){
@@ -712,5 +863,6 @@ function toast(msg){
 
 boot();
 </script>
+<script src="/static/phase1.js"></script>
 </body>
 </html>

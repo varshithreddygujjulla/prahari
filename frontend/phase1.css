@@ -1,0 +1,246 @@
+/* ===========================================================================
+   phase1.css — Phase 1 panels for PRAHARI.
+
+   Loaded after the inline <style> in index.html, so same-specificity rules
+   here win. Uses the existing custom properties throughout; nothing about the
+   corkboard, the polaroids or the lighting changes. The graph stays the
+   central element — every new surface is either a rail panel, a strip along
+   the bottom, or a drawer that only appears on demand.
+   =========================================================================== */
+
+/* --- make room for the timeline strip above the audit chain -------------- */
+/* strip is 74px on top of the 36px audit bar; rails sit 16px above the strip */
+#graph{inset:72px 0 110px 0}
+#rail,#intel{bottom:126px}
+
+/* --- header: observation window picker ---------------------------------- */
+#windowPicker{display:flex;align-items:center;gap:4px;flex-shrink:0;
+  border:1px dashed #574F44;border-radius:2px;padding:3px 6px}
+#windowPicker .wl{font:500 9px var(--mono);letter-spacing:.18em;color:#8C8172;
+  margin-right:2px}
+.win{font:400 11px var(--type);letter-spacing:.06em;color:#A89A78;cursor:pointer;
+  padding:3px 8px;border:1px solid transparent;border-radius:2px;user-select:none}
+.win:hover{color:var(--paper);border-color:#574F44}
+.win.on{background:#E8B84B;color:#231E19;border-color:#8A6E22;font-weight:500}
+
+/* --- filter chips: a 3x2 grid instead of a wrapping row ----------------- */
+/* Six chips wrapped to three ragged rows and ate 110px. A fixed grid holds
+   them in two even rows at ~58px, and every chip gets a colour when active —
+   the two registry chips previously had none and rendered as if disabled. */
+.filter-label{padding:8px 14px 2px}
+#filters{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:2px 12px 10px}
+.chip{font-size:11px;padding:4px 4px;text-align:center;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.chip[data-rel="registered-to"].on{background:#6E6353}
+.chip[data-rel="phone-linked"].on{background:var(--green)}
+
+/* --- panel tabs: a tab strip fused to the panel, not a separate card ----- */
+/* The strip cancels the rail gap beneath it and drops its own pin/shadow so
+   the active tab reads as part of the panel below. */
+/* #intel sets pointer-events:none and each card must re-enable it. The tab
+   strip and panels were missing that, so clicks passed through to the graph
+   canvas and the tabs/leads/matches never fired. */
+#panelCard,.panel{pointer-events:auto}
+#panelCard{padding:0;flex-shrink:0;margin-bottom:-10px;z-index:1;
+  background:transparent;border-color:transparent;box-shadow:none}
+#panelCard::before{display:none}
+.ptabs{display:flex;gap:4px;padding:0 6px}
+.ptab{flex:1;text-align:center;font:400 11px var(--type);letter-spacing:.05em;
+  padding:7px 4px 8px;cursor:pointer;color:var(--faded);user-select:none;transition:.12s;
+  background:var(--paper2);border:1px solid #B9A67E;border-bottom:0;border-radius:3px 3px 0 0;
+  box-shadow:0 -2px 6px rgba(20,10,4,.18)}
+.ptab:hover{color:var(--ink);background:#F3EAD5}
+.ptab.on{color:var(--redink);font-weight:500;background:var(--paper);border-color:#A8874C;
+  position:relative;top:1px;padding-bottom:9px}
+.ptab.on[data-panel="dossierCard"]{background:#D9B877}
+.panel{flex:1;min-height:0;display:flex;flex-direction:column}
+.panel::before{display:none}           /* pin would sit under the tab strip */
+#dossierCard{transform:none}           /* keep the seam with the tabs straight */
+#leadsBody,#erBody{overflow:auto;padding:10px 12px;flex:1}
+.more{font:400 11px var(--type);letter-spacing:.06em;color:var(--faded);cursor:pointer;
+  text-align:center;padding:6px;border:1px dashed #C9B892;border-radius:2px;margin:4px 0 8px}
+.more:hover{color:var(--ink);background:#F3EAD5}
+.hidden-leads[hidden]{display:none}
+
+/* --- board key inside the Profile default view --------------------------- */
+.key{margin-top:10px;padding-top:8px;border-top:1px dashed #C9B586}
+.key-h{font:700 15px var(--hand);color:var(--ink);margin-bottom:4px}
+.key .leg-grid{gap:0 6px}
+.key .leg-row{padding:2px 0}
+.key-note{font:10px var(--mono);color:var(--faded);line-height:1.6;margin-top:5px}
+.key-note b{color:var(--ink);font-weight:500}
+
+/* --- shared small parts -------------------------------------------------- */
+.notice{font:400 10px var(--mono);color:#7A6A4E;background:#F7F0DC;
+  border-left:3px solid var(--amber);padding:5px 8px;margin:8px 0;line-height:1.45}
+.pill{display:inline-block;font:500 9px var(--mono);letter-spacing:.08em;
+  padding:1px 6px;border-radius:2px;border:1px solid;vertical-align:middle}
+.p-CRITICAL{color:#7A1509;border-color:#7A1509;background:#F6DAD5}
+.p-HIGH{color:#8E3B10;border-color:#8E3B10;background:#F7E3D2}
+.p-MEDIUM{color:#7A6410;border-color:#7A6410;background:#F7EFD2}
+.p-LOW{color:#4A5A3A;border-color:#4A5A3A;background:#E9F0E2}
+.p-LIKELY_SAME_ENTITY{color:#7A1509;border-color:#7A1509;background:#F6DAD5}
+.p-POSSIBLE_SAME_ENTITY{color:#7A6410;border-color:#7A6410;background:#F7EFD2}
+.p-UNLIKELY_SAME_ENTITY{color:#4A5A3A;border-color:#4A5A3A;background:#E9F0E2}
+.mono{font-family:var(--mono)}
+
+/* --- lead cards ---------------------------------------------------------- */
+.lead{border:1px solid #C9B892;background:var(--paper2);border-radius:2px;
+  padding:9px 10px;margin-bottom:9px;cursor:pointer;transition:.12s}
+.lead:hover{background:#F3EAD5;border-color:#A8874C;transform:translateX(-1px)}
+.lead-top{display:flex;align-items:baseline;gap:8px}
+.lead-name{font:400 14px var(--type);color:var(--ink);flex:1}
+.lead-score{font:500 16px var(--mono);color:var(--redink)}
+.lead-band{font:500 9px var(--mono);letter-spacing:.1em;color:var(--faded)}
+.bar{height:6px;background:#DDD0B0;border:1px solid #B9A67E;border-radius:1px;
+  margin:6px 0 7px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.f-financial{background:#B87E1F}.f-cross{background:#2F5FA8}
+.f-comms{background:#C0392B}.f-temporal{background:#7C5CBF}
+.f-location{background:#2F7D4F}.f-multi{background:#8A6E22}
+.f-centrality{background:#6E6353}.f-er{background:#A8874C}
+.fac{display:flex;gap:7px;font:400 11px var(--mono);color:#5A5044;
+  line-height:1.5;margin-top:2px}
+.fac b{color:var(--redink);flex-shrink:0;width:26px;text-align:right}
+.fac span{flex:1}
+
+/* --- entity resolution --------------------------------------------------- */
+.cluster{border:1px solid #C9B892;background:var(--paper2);border-radius:2px;
+  padding:9px 10px;margin-bottom:9px}
+.cluster h4{font:400 13px var(--type);color:var(--ink);margin-bottom:5px}
+.member{display:inline-block;font:400 11px var(--mono);background:var(--paper);
+  border:1px solid #B9A67E;border-radius:2px;padding:2px 6px;margin:2px 3px 2px 0}
+.member.anchor{border-color:var(--redink);color:var(--redink);font-weight:500}
+.match{border-bottom:1px dotted #C9B892;padding:7px 0;cursor:pointer}
+.match:hover{background:#F3EAD5}
+.match-hd{display:flex;align-items:baseline;gap:6px;font:400 12px var(--type)}
+.match-hd b{font:500 13px var(--mono);color:var(--redink)}
+.reason{font:400 10px var(--mono);color:#5A5044;line-height:1.5;padding-left:8px}
+.reason em{color:var(--green);font-style:normal}
+.reason.neg em{color:var(--redink)}
+
+/* --- timeline strip ------------------------------------------------------ */
+/* The axis is BROKEN, not linear, when the data demands it: the corpus has 8
+   custody records in 2021-23 and ~88 case events in Jan-Mar 2026, and a single
+   linear axis crushed the case into a sliver. Each segment stays linear inside
+   itself, the break is drawn and labelled, so the picture stays honest.
+   Events sit in three lanes so same-day records do not stack on one pixel:
+     lane 0  documents     FIR · custody
+     lane 1  communication daily call aggregates
+     lane 2  money/move    transfers · travel · registrations                 */
+#timeline{position:fixed;z-index:34;left:0;right:0;bottom:36px;height:74px;
+  background:linear-gradient(#241F1A,#2E2823);border-top:2px solid #17130F;
+  padding:5px 14px 0;color:var(--paper);display:flex;flex-direction:column}
+.tl-head{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.tl-title{font:400 10px var(--type);letter-spacing:.14em;color:#CDBFA8}
+.tl-window{font:400 9px var(--mono);color:#8C8172;letter-spacing:.04em}
+.tl-legend{margin-left:auto;font:400 9px var(--mono);color:#8C8172;
+  display:flex;align-items:center;gap:5px}
+.tk{width:7px;height:7px;border-radius:50%;display:inline-block;margin-left:6px}
+.t-FIR{background:#2F5FA8}.t-CALL_ACTIVITY{background:#C0392B}
+.t-TRANSACTION{background:#B87E1F}.t-TRAVEL{background:#2F7D4F}
+.t-CUSTODY_OVERLAP{background:#7C5CBF}.t-VEHICLE_REGISTRATION{background:#6E6353}
+#tlTrack{position:relative;flex:1;margin-top:3px;border-top:1px solid #4A4038}
+.tl-lane{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.04)}
+.tl-ev{position:absolute;width:8px;height:8px;border-radius:50%;cursor:pointer;
+  transform:translate(-50%,-50%);border:1px solid rgba(0,0,0,.45);transition:.12s}
+.tl-ev:hover{transform:translate(-50%,-50%) scale(1.8);z-index:3}
+.tl-ev.big{width:11px;height:11px}
+.tl-tick{position:absolute;top:35px;font:400 8px var(--mono);color:#7A6E60;
+  transform:translateX(-50%);white-space:nowrap}
+.tl-tick::before{content:"";position:absolute;left:50%;top:-7px;width:1px;
+  height:5px;background:#4A4038}
+.tl-tick.seg{color:#CDBFA8;font-weight:500;transform:none}
+.tl-tick.seg::before{left:0}
+.tl-break{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #6E6353;
+  z-index:2}
+.tl-break::after{content:"//";position:absolute;left:-7px;top:-3px;font:700 11px var(--mono);
+  color:#8C8172;background:#2A2521;padding:0 2px}
+.tl-empty{font:400 10px var(--mono);color:#7A6E60;padding-top:10px;text-align:center}
+
+/* --- evidence drawer ----------------------------------------------------- */
+#drawer{position:fixed;z-index:60;right:14px;top:88px;bottom:120px;width:396px;
+  background:var(--paper);border:1px solid #8A7550;border-radius:2px;
+  box-shadow:-6px 6px 0 rgba(20,12,4,.45),0 0 0 1px rgba(0,0,0,.25);
+  display:flex;flex-direction:column;animation:dwIn .16s ease-out}
+/* `display:flex` outranks the hidden attribute's UA rule, so restore it. The
+   ID selectors are needed because index.html styles #dossierCard by id, which
+   would otherwise beat a plain `.panel[hidden]` class rule on specificity. */
+#drawer[hidden],.panel[hidden],
+#dossierCard[hidden],#leadsCard[hidden],#erCard[hidden]{display:none}
+@keyframes dwIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#drawer{animation:none}}
+.dw-head{display:flex;align-items:center;gap:8px;padding:10px 12px;
+  border-bottom:2px solid var(--redink);flex-shrink:0}
+.dw-head h3{font:400 14px var(--type);letter-spacing:.05em;color:var(--ink);flex:1}
+#dwBody{overflow:auto;padding:10px 13px;flex:1}
+.dw-sec{margin-bottom:12px}
+.dw-lbl{font:500 9px var(--mono);letter-spacing:.16em;color:#8A7550;
+  border-bottom:1px solid #DDD0B0;padding-bottom:2px;margin-bottom:5px}
+.dw-txt{font:400 12px var(--type);color:var(--ink);line-height:1.55}
+.dw-kv{display:flex;gap:8px;font:400 11px var(--mono);color:#5A5044;line-height:1.6}
+.dw-kv span{color:#8A7550;flex-shrink:0;min-width:88px}
+.rec{border:1px solid #DDD0B0;background:var(--paper2);border-radius:2px;
+  padding:6px 8px;margin-bottom:5px;cursor:pointer;transition:.12s}
+.rec:hover{border-color:#A8874C;background:#F3EAD5}
+.rec-id{font:500 10px var(--mono);color:var(--redink);letter-spacing:.06em}
+.rec-src{font:400 9px var(--mono);color:#8A7550;float:right}
+.rec-detail{font:400 11px var(--mono);color:#5A5044;line-height:1.45;
+  margin-top:2px;word-break:break-word}
+.unc{font:400 10px var(--mono);color:#7A4A10;background:#F9EEDA;
+  border-left:3px solid var(--amber);padding:5px 8px;margin-top:4px;line-height:1.45}
+.conf-row{display:flex;justify-content:space-between;font:400 10px var(--mono);
+  color:#5A5044;padding:2px 0;border-bottom:1px dotted #DDD0B0}
+.conf-row b{color:var(--redink)}
+
+/* --- ADD DATA button + modal -------------------------------------------- */
+#addDataBtn{background:#2F5A3A;color:#EAF6EE;border-color:#173021;
+  box-shadow:2px 2px 0 #173021}
+#addDataBtn:hover{box-shadow:3px 3px 0 #173021}
+#addModal{position:fixed;inset:0;z-index:80;background:rgba(20,14,8,.62);
+  display:flex;align-items:center;justify-content:center;animation:amIn .16s ease-out}
+#addModal[hidden]{display:none}
+@keyframes amIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){#addModal{animation:none}}
+.am-panel{width:min(760px,94vw);max-height:88vh;display:flex;flex-direction:column;
+  background:var(--paper);border:1px solid #8A7550;border-radius:3px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);transform:rotate(-.2deg)}
+.am-head{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:2px solid var(--redink)}
+.am-head h3{flex:1;font:400 15px var(--type);letter-spacing:.08em;color:var(--ink)}
+.am-body{padding:14px 16px;overflow:auto}
+.am-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.am-row label{display:flex;flex-direction:column;gap:3px;font:400 10px var(--type);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--faded);flex:1;min-width:150px}
+.am-row select,.am-row input[type=file]{font:13px var(--type);padding:6px 8px;
+  border:1.5px solid #B9A67E;border-radius:2px;background:var(--paper2);color:var(--ink)}
+#amPayload{width:100%;height:150px;font:12px var(--mono);line-height:1.5;padding:9px 11px;
+  border:1.5px solid #B9A67E;border-radius:2px;background:#FBF7EC;color:var(--ink);
+  resize:vertical;outline:none}
+#amPayload:focus{border-color:#A8874C}
+.am-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+.am-chk{font:400 11px var(--mono);color:var(--faded);display:flex;align-items:center;gap:5px}
+.am-foot{padding:9px 16px;border-top:1px dashed #C9B586;font:10px var(--mono);
+  color:var(--faded);line-height:1.55}
+.am-foot b{color:var(--ink)}
+/* preview */
+.am-summary{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 8px}
+.am-stat{font:500 10px var(--mono);letter-spacing:.04em;padding:3px 8px;border-radius:2px;
+  border:1px solid}
+.am-stat.ok{color:#2F5A3A;border-color:#2F5A3A;background:#E7F0E8}
+.am-stat.warn{color:#7A6410;border-color:#7A6410;background:#F7EFD2}
+.am-stat.bad{color:#7A1509;border-color:#7A1509;background:#F6DAD5}
+.am-stat.mut{color:#5A5044;border-color:#C9B586;background:var(--paper2)}
+.am-rec{border:1px solid #C9B892;border-radius:2px;background:var(--paper2);
+  padding:7px 9px;margin-bottom:6px}
+.am-rec-top{display:flex;align-items:center;gap:8px;font:500 11px var(--mono)}
+.am-rec-id{color:var(--ink)}
+.am-fields{font:10px var(--mono);color:#5A5044;margin-top:4px;line-height:1.5;
+  word-break:break-word}
+.am-fields .nul{color:#B08A3A;font-style:italic}
+.am-issue{font:10px var(--mono);color:#7A4A10;margin-top:3px}
+.am-conflict{font:10px var(--mono);color:#7A1509;background:#F9E4DF;
+  border-left:3px solid var(--redink);padding:4px 7px;margin-top:4px;line-height:1.45}
+.am-done{font:12px var(--type);color:#2F5A3A;background:#E7F0E8;border:1px solid #2F5A3A;
+  border-radius:2px;padding:9px 11px;line-height:1.5}
+.am-held{font:11px var(--mono);color:#7A4A10;margin-top:6px;line-height:1.5}
