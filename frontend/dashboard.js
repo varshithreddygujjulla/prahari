@@ -213,12 +213,12 @@
   /* Photo-card nodes: a dark evidence card carrying a silhouette (people) or a
      type glyph (phones, accounts, vehicles, organisations) with the name in a
      bar at the bottom. Reads like a case-board photo rather than a bare dot. */
-  function nodeRenderer(n) {
+  function nodeRenderer(n, view) {
     var k = KIND[n.kind] || KIND.person;
     var isLead = n.lead_band === "PRIORITY REVIEW" || n.id === controllerName();
     var isPerson = n.kind === "person";
     var accent = isLead ? "#f85149" : k.c;
-    var w = isPerson ? 54 : 76, cardH = isPerson ? 58 : 40, labelH = 16;
+    var w = isPerson ? 58 : 80, cardH = isPerson ? 62 : 42, labelH = 18;
     var h = cardH + labelH;                 // full node box incl. name below
     return function (p) {
       var ctx = p.ctx, x = p.x, y = p.y, sel = p.state.selected || p.state.hover;
@@ -226,18 +226,18 @@
         drawNode: function () {
           var rx = x - w / 2, ry = y - h / 2;
           ctx.save();
-          // card + drop shadow
-          ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
+          // card + a tight drop shadow (a wide blur reads as fuzz at small zoom)
+          ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
           roundRect(ctx, rx, ry, w, cardH, 7);
           ctx.fillStyle = "#141a24"; ctx.fill();
           ctx.shadowColor = "transparent";
           // top accent strip (colour by type / lead)
           ctx.save(); roundRect(ctx, rx, ry, w, cardH, 7); ctx.clip();
           ctx.fillStyle = accent; ctx.fillRect(rx, ry, w, 4); ctx.restore();
-          // border (glows when selected / lead)
-          if (sel || isLead) { ctx.shadowColor = accent; ctx.shadowBlur = 14; }
-          ctx.lineWidth = sel ? 2.5 : isLead ? 2 : 1;
-          ctx.strokeStyle = sel ? "#ffffff" : isLead ? accent : "#2b3444";
+          // border (glows only when selected / lead)
+          if (sel || isLead) { ctx.shadowColor = accent; ctx.shadowBlur = 10; }
+          ctx.lineWidth = sel ? 2.5 : isLead ? 2 : 1.2;
+          ctx.strokeStyle = sel ? "#ffffff" : isLead ? accent : "#3a4556";
           roundRect(ctx, rx, ry, w, cardH, 7); ctx.stroke();
           ctx.shadowColor = "transparent";
 
@@ -247,16 +247,21 @@
           } else {
             ctx.fillStyle = "#20293a"; ctx.fillRect(rx + pad, photoTop, w - 2 * pad, photoH);
             ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.font = "19px system-ui,'Segoe UI Emoji'";
+            ctx.font = "20px system-ui,'Segoe UI Emoji'";
             ctx.fillText(k.i, x, photoTop + photoH / 2);
           }
-          // full name BELOW the card — never truncated, dark stroke for legibility
-          ctx.font = "600 13px Inter,sans-serif";
+          // Full name BELOW the card, never truncated. The label grows as the
+          // view zooms out (up to 1.6x) so names stay readable when the whole
+          // network is on screen, and shrinks back to normal when zoomed in.
+          var grow = Math.min(1.6, Math.max(1, 0.9 / (view.scale || 1)));
+          var fs = Math.round(13 * grow);
+          ctx.font = "700 " + fs + "px Inter,sans-serif";
           ctx.textAlign = "center"; ctx.textBaseline = "middle";
-          ctx.lineWidth = 4; ctx.strokeStyle = "#0a0d12";
-          ctx.strokeText(n.id, x, ry + cardH + labelH / 2);
-          ctx.fillStyle = sel ? "#ffffff" : "#dbe2ea";
-          ctx.fillText(n.id, x, ry + cardH + labelH / 2);
+          ctx.lineWidth = Math.max(2.5, fs * 0.22); ctx.lineJoin = "round"; ctx.strokeStyle = "#0a0d12";
+          var ly = ry + cardH + (labelH * grow) / 2;
+          ctx.strokeText(n.id, x, ly);
+          ctx.fillStyle = sel ? "#ffffff" : "#e6edf3";
+          ctx.fillText(n.id, x, ly);
           // pin
           ctx.beginPath(); ctx.arc(x, ry + 3, 2.6, 0, 7);
           ctx.fillStyle = accent; ctx.fill();
@@ -283,42 +288,48 @@
     var old = container === "graph" ? NET : NET2;
     if (old) { try { old.destroy(); } catch (x) {} }
     var active = nodesInWindow();
+    var view = { scale: 1 };      // shared with the node renderer: current zoom
     var nodes = DATA.nodes.map(function (n) {
       return {
         id: n.id, _kind: n.kind,
-        shape: "custom", ctxRenderer: nodeRenderer(n),
+        shape: "custom", ctxRenderer: nodeRenderer(n, view),
         hidden: !!((kf && n.kind !== kf) || !active[n.id]),   // MUST be boolean
       };
     });
     var edges = DATA.edges.map(function (e, i) {
+      // Only labels that carry a number: the relation type is already the
+      // string's colour (see legend / filter), repeating it on every edge is noise.
       var lbl = "";
-      if (e.rel === "calls" && e.calls) lbl = "Calls (" + e.calls + ")";
-      else if (e.rel === "money") lbl = "Financial Transfer";
-      else if (e.rel === "co-accused") lbl = "Co-accused";
-      else if (e.rel === "registered-to") lbl = "Owns";
+      if (e.rel === "calls" && e.calls) lbl = e.calls + (e.calls === 1 ? " call" : " calls");
+      else if (e.rel === "money" && e.money_inr) lbl = inr(e.money_inr);
       var col = edgeColor(e.rel);
       var registry = e.rel === "registered-to" || e.rel === "phone-linked";
       return {
         id: "e" + i, from: e.from, to: e.to, _rel: e.rel, _i: i,
-        // Bright, glowing "strings" — thicker and lit, like a case board.
-        color: { color: col, highlight: "#ffffff", opacity: registry ? 0.55 : 0.9 },
-        width: e.money_inr ? 3.2 : registry ? 1.2 : e.calls ? Math.min(2 + e.calls / 6, 4) : 2.2,
-        shadow: registry ? false : { enabled: true, color: col, size: 9, x: 0, y: 0 },
-        dashes: e.rel === "jailed-together" ? [6, 6] : registry ? [2, 4] : false,
-        label: lbl, font: { color: "#b3bcc7", size: 12, face: "Inter",
-          strokeWidth: 3, strokeColor: "#0a0d12", align: "middle" },
-        smooth: { type: "continuous", roundness: 0.18 },
+        // Crisp, solid "strings": no glow shadow (it smears into a haze when
+        // dozens of edges cross), a touch thicker and fully opaque instead.
+        color: { color: col, highlight: "#ffffff", hover: "#ffffff", opacity: registry ? 0.6 : 1 },
+        width: e.money_inr ? 3.4 : registry ? 1.3 : e.calls ? Math.min(2.2 + e.calls / 6, 4.2) : 2.4,
+        shadow: false,
+        dashes: e.rel === "jailed-together" ? [7, 6] : registry ? [2, 4] : false,
+        label: lbl, font: { color: "#c9d1d9", size: 12, face: "Inter", bold: { mod: "600" },
+          strokeWidth: 4, strokeColor: "#0a0d12", align: "middle" },
+        smooth: { type: "continuous", roundness: 0.15 },
         hidden: !!(rf && e.rel !== rf),
       };
     });
     var nd = new vis.DataSet(nodes), ed = new vis.DataSet(edges);
     if (container === "graph") { nodesDS = nd; edgesDS = ed; }
     var net = new vis.Network($(container), { nodes: nd, edges: ed }, {
-      // bigger photo-cards need more breathing room than dots did
-      physics: { barnesHut: { gravitationalConstant: -20000, springLength: 210,
-        springConstant: 0.025, avoidOverlap: 0.7 }, stabilization: { iterations: 260 } },
+      // Tighter springs than before: the whole network then fits the card at a
+      // higher zoom, which is the single biggest legibility win.
+      physics: { barnesHut: { gravitationalConstant: -15000, springLength: 165,
+        springConstant: 0.03, avoidOverlap: 0.8 }, stabilization: { iterations: 300 } },
       interaction: { hover: true, tooltipDelay: 150, hideEdgesOnDrag: true },
+      edges: { hoverWidth: 1.5, selectionWidth: 2 },
     });
+    // Keep the renderer's zoom in step with the view so labels can compensate.
+    net.on("zoom", function (p) { view.scale = p.scale; });
     net.on("click", function (p) {
       if (p.nodes && p.nodes.length) { openEntity(p.nodes[0]); return; }
       if (p.edges && p.edges.length) {
@@ -330,8 +341,10 @@
       net.fit({ animation: false });
       // fit() can zoom out too far when a few pendant nodes sit on the edge;
       // clamp to a readable minimum so labels stay legible on load.
-      if (net.getScale() < 0.62) net.moveTo({ scale: 0.7 });
+      if (net.getScale() < 0.58) net.moveTo({ scale: 0.62 });
+      view.scale = net.getScale();
       net.setOptions({ physics: false });
+      net.redraw();
     });
     if (container === "graph") { NET = net; if (DEBUG) window.__NET = net; }
     else NET2 = net;
@@ -351,7 +364,7 @@
       NET.setSize(Math.round(box.width) + "px", Math.round(box.height) + "px");
       NET.redraw();
       NET.fit({ animation: false });
-      if (NET.getScale() < 0.62) NET.moveTo({ scale: 0.72 });
+      if (NET.getScale() < 0.58) NET.moveTo({ scale: 0.62 });
     }, 80);
   }
 
