@@ -32,7 +32,9 @@ def data_fingerprint() -> str:
     parts: List[str] = []
     for root, _dirs, files in os.walk(BASE):
         for fn in sorted(files):
-            if fn.endswith((".csv", ".txt")):
+            # retracted.json changes what the loaders return, so it is part of
+            # the data revision; the other json files (audit, decisions) are not
+            if fn.endswith((".csv", ".txt")) or fn == "retracted.json":
                 p = os.path.join(root, fn)
                 try:
                     st = os.stat(p)

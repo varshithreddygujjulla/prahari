@@ -289,8 +289,13 @@ def load_identity_variants() -> List[Record]:
 
 # ---------------------------------------------------------------- entry point
 def load_all() -> Dict[str, List[Record]]:
-    """Load every source. Returns {source_key: [Record, ...]}."""
-    return {
+    """Load every source. Returns {source_key: [Record, ...]}.
+
+    Records retracted through the ADD DATA undo are dropped HERE, after every
+    row has been numbered, so ids never shift when something is withdrawn.
+    The rows stay in the files for the audit trail."""
+    from backend.ingestion.retraction import retracted_ids   # avoids an import cycle
+    out = {
         "fir":               load_firs(),
         "cdr":               load_cdr(),
         "bank":              load_bank(),
@@ -301,3 +306,7 @@ def load_all() -> Dict[str, List[Record]]:
         "prison":            load_prison(),
         "identity_variants": load_identity_variants(),
     }
+    tomb = retracted_ids()
+    if tomb:
+        out = {k: [r for r in v if r.record_id not in tomb] for k, v in out.items()}
+    return out

@@ -341,11 +341,25 @@ def _quality(present: int, total: int, missing_required: bool,
 
 # ---------------------------------------------------------------- existing data
 def _read_store(filename: str) -> List[Dict[str, str]]:
+    """Every row in the file, tombstoned or not — the positional id space."""
     path = os.path.join(BASE, filename)
     if not os.path.exists(path):
         return []
     with open(path, encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
+
+
+def _live_store(skey: str) -> List[Dict[str, str]]:
+    """Rows that are still in force: retracted rows stay in the file (so ids
+    never shift) but must not count as an existing duplicate or conflict —
+    re-adding a record that was retracted by mistake is legitimate."""
+    from backend.ingestion.retraction import retracted_ids
+    spec = SOURCES[skey]
+    tomb = retracted_ids()
+    if not tomb:
+        return _read_store(spec["store"])
+    return [row for i, row in enumerate(_read_store(spec["store"]), start=1)
+            if f"{spec['prefix']}-{i:04d}" not in tomb]
 
 
 def _conflicts(skey: str, parsed: Dict[str, Any],
@@ -398,7 +412,7 @@ def _process_row(skey: str, row: Dict[str, Any], mapping: Dict[str, str],
     spec = SOURCES[skey]
     fields = spec["fields"]
     if existing is None:
-        existing = _read_store(spec["store"])
+        existing = _live_store(skey)
     parsed: Dict[str, Any] = {}
     raw: Dict[str, Any] = {}
     issues: List[str] = []
@@ -560,7 +574,7 @@ def preview(source_type: str, fmt: str, payload: str,
         return {"error": err}
     if not all(isinstance(r, dict) for r in rows):
         return {"error": "every record must be a JSON object"}
-    existing = _read_store(SOURCES[skey]["store"])       # once, not per row
+    existing = _live_store(skey)                         # once, not per row
     records = [_process_row(skey, r, mapping or {}, i, existing)
                for i, r in enumerate(rows)]
     # duplicates within the batch itself: the second copy is flagged

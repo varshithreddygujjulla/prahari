@@ -35,3 +35,5 @@ data/decisions.json
 data/cctv.csv
 data/gps.csv
 data/social.csv
+data/ingestions.json
+data/retracted.json

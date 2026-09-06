@@ -27,7 +27,7 @@ from backend.pipeline import build_payload                      # noqa: E402
 
 # Session-created state that must not leak into the copy either.
 _NOT_COPIED = ("audit_chain.json", "decisions.json", "cctv.csv", "gps.csv",
-               "social.csv", "__pycache__")
+               "social.csv", "ingestions.json", "retracted.json", "__pycache__")
 
 
 @pytest.fixture(scope="session", autouse=True)

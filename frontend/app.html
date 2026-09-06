@@ -586,11 +586,12 @@ body.graph-full #main{z-index:95}
 
   <!-- ===================== INGESTION ===================== -->
   <div class="view" id="view-ingestion">
-    <div class="placeholder"><div class="pi">&#128228;</div><h2>Data Ingestion</h2>
-      <p>Use <b>Add Data</b> (top right) to ingest a new FIR, CDR, transfer, vehicle and more —
-      with validation, quality scoring and conflict detection before anything touches the graph.</p>
-      <button class="abtn blue" style="display:inline-flex;margin-top:16px" onclick="document.getElementById('addDataBtn').click()">&#65291; Open Add Data</button>
+    <div class="card-h" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+      <span class="ci">&#128228;</span><h3>Data Ingestion</h3>
+      <span class="sub">Every Add Data commit is a batch. A batch added by mistake is <b>retracted</b> with a reason — hidden from the board, kept on file, audited, reversible.</span>
+      <button class="abtn blue" style="margin-left:auto" onclick="document.getElementById('addDataBtn').click()">&#65291; Add Data</button>
     </div>
+    <div id="batchList"></div>
   </div>
 
   <!-- placeholders -->

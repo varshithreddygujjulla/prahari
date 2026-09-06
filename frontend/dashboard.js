@@ -805,6 +805,61 @@
     });
   }
 
+  /* ==================================================== ingestion batches (undo) */
+  // "How do I delete what I added?" — you don't delete evidence, you retract
+  // it: the batch is hidden from the board, its rows stay on file, the reason
+  // goes to the audit log, and it can be restored. The shipped corpus has no
+  // batch and so cannot be retracted from here.
+  function renderIngestion() {
+    var el = $("batchList"); if (!el) return;
+    el.innerHTML = '<div class="dw-txt" style="color:var(--muted)">Loading batches…</div>';
+    api("/api/intake/batches").then(function (d) {
+      var bs = d.batches || [];
+      if (!bs.length) {
+        el.innerHTML = '<div class="card"><div class="ent-empty">Nothing has been added through Add Data yet. ' +
+          "The shipped corpus is not a batch — it is restored with <code>python backend/reset_demo_data.py</code>.</div></div>";
+        return;
+      }
+      el.innerHTML = bs.map(function (b) {
+        var ids = b.record_ids || [];
+        return '<div class="card" style="padding:14px 16px;margin-bottom:12px' + (b.retracted ? ";opacity:.75" : "") + '">' +
+          '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+          '<b style="font:600 13px var(--mono);color:var(--accent2)">' + esc(b.batch_id) + "</b>" +
+          '<span class="tag blue">' + esc(b.source_type) + "</span>" +
+          (b.staged ? '<span class="tag mut">staged</span>' : "") +
+          (b.retracted ? '<span class="tag red">RETRACTED</span>' : '<span class="tag green">on board</span>') +
+          '<span style="margin-left:auto;font:11px var(--mono);color:var(--muted)">' + esc((b.timestamp || "").replace("T", " ")) + " · " + esc(b.officer) + "</span></div>" +
+          '<div style="margin-top:8px;font:12px var(--ui);color:var(--text2)">' + ids.length + " record(s): " +
+          ids.slice(0, 10).map(function (id) { return '<span class="chip-r" data-rec="' + esc(id) + '">[' + esc(id) + "]</span>"; }).join(" ") +
+          (ids.length > 10 ? " +" + (ids.length - 10) + " more" : "") + "</div>" +
+          (b.retracted && b.retraction ? '<div class="disc" style="margin-top:8px">Retracted by ' + esc(b.retraction.officer) + " on " +
+            esc((b.retraction.timestamp || "").replace("T", " ")) + ": " + esc(b.retraction.reason) + "</div>" : "") +
+          '<div class="decide">' + (b.retracted
+            ? '<button class="dbtn ok" data-restore="' + esc(b.batch_id) + '">↺ Restore to board</button>'
+            : '<button class="dbtn no" data-retract="' + esc(b.batch_id) + '">✕ Retract batch</button>') + "</div></div>";
+      }).join("") + '<div class="disc">' + esc(d.note || "") + "</div>";
+      el.querySelectorAll("[data-rec]").forEach(function (x) { x.onclick = function () { openRecordDrawer(x.dataset.rec); }; });
+      el.querySelectorAll("[data-retract]").forEach(function (x) {
+        x.onclick = function () {
+          var reason = window.prompt("Why is batch " + x.dataset.retract + " being retracted? (recorded in the audit log)", "");
+          if (reason === null) return;
+          if (reason.trim().length < 3) { toast("A reason is required to retract records"); return; }
+          post("/api/intake/retract", { batch_id: x.dataset.retract, reason: reason, officer: OFFICER })
+            .then(function (r) { toast(r.retracted_ids.length + " record(s) retracted — board rebuilt"); renderIngestion(); window.refreshCase(); })
+            .catch(function (e) { toast("Could not retract: " + e); });
+        };
+      });
+      el.querySelectorAll("[data-restore]").forEach(function (x) {
+        x.onclick = function () {
+          if (!window.confirm("Restore batch " + x.dataset.restore + " to the board?")) return;
+          post("/api/intake/restore", { batch_id: x.dataset.restore, officer: OFFICER })
+            .then(function (r) { toast(r.restored_ids.length + " record(s) restored — board rebuilt"); renderIngestion(); window.refreshCase(); })
+            .catch(function (e) { toast("Could not restore: " + e); });
+        };
+      });
+    }).catch(function (e) { el.innerHTML = '<div class="ent-empty">Could not load batches: ' + esc(String(e)) + "</div>"; });
+  }
+
   /* ==================================================== views */
   var VIEW_TITLE = { overview: "Case Board", network: "Network Graph", timeline: "Timeline",
     map: "Map & Location", analytics: "Analytics", reports: "Reports", leads: "Investigative Leads",
@@ -817,6 +872,7 @@
     var vt = $("viewTitle"); if (vt) vt.textContent = VIEW_TITLE[name] || name;
     if (name === "network" && !NET2) buildGraph("graph2");
     if (name === "audit") renderAudit();
+    if (name === "ingestion") renderIngestion();
     if ((name === "network" || name === "overview") && NET) setTimeout(function () { NET.redraw(); }, 60);
   }
 
@@ -1021,11 +1077,15 @@
         // No forced reload: keep the held-record reasons on screen and refresh
         // the board in place when the user is done reading them.
         $("amResult").innerHTML = '<div class="am-done">Added <b>' + d.written + "</b> record(s)" +
-          (d.written_ids && d.written_ids.length ? " (" + esc(d.written_ids.slice(0, 8).join(", ")) + ")" : "") + ". " + esc(d.note || "") + "</div>" +
+          (d.written_ids && d.written_ids.length ? " (" + esc(d.written_ids.slice(0, 8).join(", ")) + ")" : "") + ". " + esc(d.note || "") +
+          (d.batch_id ? '<div style="margin-top:6px;font:11px var(--mono);color:var(--muted)">Batch ' + esc(d.batch_id) +
+            ' — added in error? <a data-batches style="color:var(--accent2);cursor:pointer">Data Ingestion → Retract batch</a></div>' : "") + "</div>" +
           (held.length ? '<div class="am-issue" style="margin-top:6px">Held for review:<br>' + held.map(esc).join("<br>") + "</div>" : "") +
           (d.written && !d.staged ? '<button class="abtn blue" id="amRefresh" style="margin-top:10px">Close &amp; refresh board</button>' : "");
         var rb = $("amRefresh");
         if (rb) rb.onclick = function () { closeAddData(); toast("Refreshing board with new data…"); window.refreshCase(); };
+        var gb = $("amResult").querySelector("[data-batches]");
+        if (gb) gb.onclick = function () { closeAddData(); showView("ingestion"); };
       }).catch(function (e) { $("amResult").innerHTML = '<div class="am-conflict">' + esc(String(e)) + "</div>"; $("amCommit").disabled = false; });
     };
     $("amFile").onchange = function (ev) { var f = ev.target.files && ev.target.files[0]; if (!f) return;
@@ -1106,11 +1166,7 @@
   function wireNav() {
     document.querySelectorAll(".navitem[data-view]").forEach(function (t) {
       t.setAttribute("role", "button"); t.tabIndex = 0;      // keyboard reachable
-      t.onclick = function () {
-        var v = t.dataset.view;
-        if (v === "ingestion") { $("addDataBtn").click(); return; }
-        showView(v);
-      };
+      t.onclick = function () { showView(t.dataset.view); };
       t.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); t.click(); } };
     });
   }

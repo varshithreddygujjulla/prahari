@@ -19,6 +19,7 @@ from backend.audit import AuditChain, ACTIONS as AUDIT_ACTIONS
 from backend.cases import record_decision, get_decisions, ACTIONS as DECISION_ACTIONS, DECISION_TO_AUDIT
 from backend.cases.decisions import DecisionStoreError
 from backend.ingestion import intake
+from backend.ingestion import retraction
 from backend.pipeline import analysis, build_payload, invalidate
 
 router = APIRouter()
@@ -79,15 +80,69 @@ def intake_commit(body: IntakeBody):
                            body.mapping, body.include_conflicts)
     if "error" in result:
         raise HTTPException(400, result["error"])
+    # Every commit is a batch, so it can be retracted later as one unit.
+    if result["written"]:
+        batch = retraction.record_batch(result["source_type"], result["written_ids"],
+                                        body.officer, staged=bool(result.get("staged")))
+        result["batch_id"] = batch["batch_id"]
     audit.record(body.officer,
                  f"DATA_INGESTED: {result['written']} {result['source_type']} "
-                 f"record(s) [{', '.join(result['written_ids'][:8])}]",
-                 action_type="ADMIN_ACTION", target=result["source_type"])
+                 f"record(s) [{', '.join(result['written_ids'][:8])}]"
+                 + (f" batch {result['batch_id']}" if result.get("batch_id") else ""),
+                 action_type="ADMIN_ACTION", target=result.get("batch_id") or result["source_type"])
     # Only a graph-backed source changes the board; staged sources do not.
     if result["written"] and not result.get("staged"):
         invalidate()
         result["stats"] = build_payload(force=True)["stats"]
     return result
+
+
+# ---------------------------------------------------------------- retraction (undo ADD DATA)
+class RetractBody(BaseModel):
+    batch_id: str = Field(..., max_length=64, pattern=r"^ING-[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$")
+    reason: Optional[str] = Field(None, max_length=500)
+    officer: str = Field("Officer-101", max_length=64)
+
+
+@router.get("/api/intake/batches")
+def intake_batches():
+    """Every ADD DATA commit, newest first, with its retraction state. The
+    shipped corpus is not a batch and therefore cannot be retracted here."""
+    return {"batches": retraction.list_batches(),
+            "note": "Retracting hides a batch from the board and keeps its rows on "
+                    "file for the audit trail; record ids never change."}
+
+
+@router.post("/api/intake/retract")
+def intake_retract(body: RetractBody):
+    """Withdraw one batch (e.g. records pasted from the wrong case). Needs a
+    reason; audited; reversible with /api/intake/restore."""
+    try:
+        res = retraction.retract(body.batch_id, body.officer, body.reason or "")
+    except retraction.RetractionError as e:
+        raise HTTPException(400, str(e))
+    audit.record(body.officer,
+                 f"DATA_RETRACTED: batch {body.batch_id} ({len(res['retracted_ids'])} "
+                 f"record(s)) — {res['reason']}",
+                 action_type="ADMIN_ACTION", target=body.batch_id)
+    invalidate()
+    res["stats"] = build_payload(force=True)["stats"]
+    return res
+
+
+@router.post("/api/intake/restore")
+def intake_restore(body: RetractBody):
+    """Reinstate a retracted batch — the rows never left the file."""
+    try:
+        res = retraction.restore(body.batch_id, body.officer)
+    except retraction.RetractionError as e:
+        raise HTTPException(400, str(e))
+    audit.record(body.officer,
+                 f"DATA_RESTORED: batch {body.batch_id} ({len(res['restored_ids'])} record(s))",
+                 action_type="ADMIN_ACTION", target=body.batch_id)
+    invalidate()
+    res["stats"] = build_payload(force=True)["stats"]
+    return res
 
 
 # ---------------------------------------------------------------- ask (assistant)

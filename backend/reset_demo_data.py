@@ -37,7 +37,8 @@ CORPUS_FILES = [
     "phone_directory.csv", "prison.csv", "travel.csv", "vehicles.csv",
 ]
 # Derived state that a demo session creates. Removed on restore.
-DERIVED_FILES = ["decisions.json", "cctv.csv", "gps.csv", "social.csv"]
+DERIVED_FILES = ["decisions.json", "cctv.csv", "gps.csv", "social.csv",
+                 "ingestions.json", "retracted.json"]
 AUDIT_FILE = "audit_chain.json"
 
 
