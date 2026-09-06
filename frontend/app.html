@@ -88,10 +88,6 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 #tabsbar{position:fixed;top:var(--topbar);left:var(--sidebar);right:0;height:var(--tabs);z-index:30;
   display:flex;align-items:center;gap:4px;padding:0 18px;background:var(--bg);
   border-bottom:1px solid var(--border)}
-.tab{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:7px;
-  color:var(--muted);font:500 13px var(--ui);cursor:pointer;user-select:none}
-.tab:hover{background:var(--panel2);color:var(--text)}
-.tab.on{background:var(--accent);color:#fff}
 .tabspring{flex:1}
 .viewtitle{font:600 15px var(--ui);color:var(--text)}
 .abtn{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:7px;
@@ -125,7 +121,7 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 /* overview grid */
 .ov-grid{display:grid;grid-template-columns:1fr 340px;gap:14px;margin-bottom:14px}
 .ov-bottom{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:14px}
-@media(max-width:1400px){.ov-grid{grid-template-columns:1fr 320px}.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1400px){.ov-grid{grid-template-columns:1fr 320px}}
 
 /* graph */
 .graphwrap{position:relative}

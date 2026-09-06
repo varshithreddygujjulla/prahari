@@ -453,7 +453,7 @@ async function boot(){
   say(`\u2714  Parsed ${DATA.stats.firs_parsed} FIRs across Delhi &amp; Mumbai police districts`,"ok");
   say(`\u2714  Cross-linked CDR \u00b7 bank transactions \u00b7 prison rosters \u00b7 travel manifests`,"ok");
   for(const n of DATA.nodes.filter(x=>x.kind!=="person").slice(0,3))
-    say(`\u26a0  Unresolved entity: ${n.id} [${n.kind.replace("_"," ")}]`,"warn");
+    say(`\u26a0  Unresolved entity: ${esc(n.id)} [${esc(n.kind.replace("_"," "))}]`,"warn");
   say(`\u2714  ${DATA.stats.people} entities identified \u2014 printing photographs to board`,"ent");
   say(`\u2714  Stringing connections: ${DATA.stats.edges} links \u00b7 ${DATA.stats.communities} clusters`,"ok");
   say(`\u2714  AI analysis complete in ${ms}\u202fms \u2014 board is live`,"ent");
@@ -739,26 +739,26 @@ function members(comm){return DATA.nodes.filter(n=>n.community===comm&&n.kind===
 const steps=()=>[
  {tag:"STEP 1 \u00b7 TWO CELLS",color:"blue",
   text:`Grouping the photographs: two interaction clusters separate out of the noise \u2014 `+
-       `Cluster A centred on <strong>${roles.leaders[0]}</strong>, `+
-       `Cluster B on <strong>${roles.leaders[1]}</strong>. Clusters are statistical \u2014 not established groups.`,
+       `Cluster A centred on <strong>${esc(roles.leaders[0])}</strong>, `+
+       `Cluster B on <strong>${esc(roles.leaders[1])}</strong>. Clusters are statistical \u2014 not established groups.`,
   src:"algorithm: greedy modularity community detection",
   act(){const ids=[...members(roles.gangComms[0]),...members(roles.gangComms[1])];
     dimExcept(ids);focusOn(ids);}},
  {tag:"STEP 2 \u00b7 THE BROKER",color:"red",
-  text:`The yellow sticky: unresolved number <strong>${roles.burner}</strong> calls the most central `+
+  text:`The yellow sticky: unresolved number <strong>${esc(roles.burner)}</strong> calls the most central `+
        `entities in BOTH clusters. No subscriber is registered to it, so the handset \u2014 `+
        `holder is not established by these records.`,
-  src:`evidence: CDR \u2014 device ${roles.burner}`,
+  src:`evidence: CDR \u2014 device ${esc(roles.burner)}`,
   act(){const ids=[roles.burner,...roles.leaders];dimExcept(ids);focusOn(ids);}},
  {tag:"STEP 3 \u00b7 FOLLOW THE MONEY",color:"amber",
   text:`Both leaders wire funds to the same shell company \u2014 `+
-       `<strong>${roles.shell}</strong>. `+
+       `<strong>${esc(roles.shell)}</strong>. `+
        `Many sources in, one consolidated payout out \u2014 the movement pattern `+
        `associated with layering. Consolidation is also ordinary commerce.`,
   src:"evidence: FIU-IND transaction records",
   act(){const ids=[roles.shell,...roles.leaders,roles.kingpin];dimExcept(ids);focusOn(ids);}},
  {tag:"STEP 4 \u00b7 NETWORK CONTROLLER",color:"red",
-  text:`Money exits to <strong>${roles.kingpin}</strong> \u2014 a face on the board named in `+
+  text:`Money exits to <strong>${esc(roles.kingpin)}</strong> \u2014 a face on the board named in `+
        `<strong>ZERO FIRs</strong> in this corpus \u2014 financially central, absent `+
        `from the case record. PRAHARI flags this as an investigative lead for `+
        `review, not a finding of involvement.`,
@@ -770,7 +770,7 @@ const steps=()=>[
     setTimeout(()=>$("lock").classList.remove("show"),reduceMotion?600:2600);}},
  {tag:"STEP 5 \u00b7 WHERE IT BEGAN",color:"violet",
   text:`Dashed purple string: both cell leaders overlapped at `+
-       `<strong>${roles.jailEdge?roles.jailEdge.source:"the same cell block"}</strong> in 2022. `+
+       `<strong>${esc(roles.jailEdge?roles.jailEdge.source:"the same cell block")}</strong> in 2022. `+
        `Shared custody establishes proximity, not association \u2014 and it `+
        `predates the case window by four years.`,
   src:"evidence: e-Prisons inmate roster",
@@ -827,7 +827,7 @@ function endCrack(){
   $("stepcount").hidden=true;
   undim();network.fit({animation:anim});
   logEntry("CASE BRIEF","green","Full AI investigator brief generated:");
-  DATA.insights.forEach(t=>{const[h,...r]=t.split(" \u2014 ");logEntry(h,"cyan",r.join(" \u2014 "));});
+  DATA.insights.forEach(t=>{const[h,...r]=t.split(" \u2014 ");logEntry(esc(h),"cyan",esc(r.join(" \u2014 ")));});
 }
 
 /* ================= blockchain audit chain ================= */

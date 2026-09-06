@@ -71,6 +71,10 @@
 
   /* ==================================================== boot */
   function boot() {
+    // Visible loading state: the strip and the graph card say what is happening
+    // instead of sitting blank until the first payload lands.
+    $("statStrip").innerHTML = '<span class="stat-i"><span class="ic">⏳</span>Loading case data — building the evidence graph…</span>';
+    $("graph").innerHTML = '<div class="ent-empty">Loading graph…</div>';
     Promise.all([
       api("/api/graph?window=" + WINDOW),
       api("/api/decisions").catch(function () { return { decisions: {} }; }),
@@ -87,7 +91,10 @@
       renderER();
       renderFullTimeline();
       renderAlerts();
-    }).catch(function (e) { toast("Failed to load case data: " + e); console.error(e); });
+    }).catch(function (e) {
+      $("statStrip").innerHTML = '<span class="stat-i" style="color:var(--red)">Could not load case data: ' + esc(String(e)) + " — is the server running?</span>";
+      toast("Failed to load case data: " + e); console.error(e);
+    });
   }
 
   function decisionOf(kind, target) { return DECISIONS[kind + ":" + target]; }
@@ -821,41 +828,73 @@
     var ctrl = controllerName();
     return { leaders: leaders, burner: burner, shell: shell, ctrl: ctrl };
   }
+  // Every walkthrough sentence is derived from the payload and cites the
+  // records behind the edges it talks about — no hardcoded years, counts or
+  // names, so the story cannot drift from the data it claims to describe.
+  function edgeBetween(a, b) {
+    return (DATA.edges || []).find(function (e) {
+      return (e.from === a && e.to === b) || (e.from === b && e.to === a); });
+  }
+  function citeEdges(pairs, extra) {
+    var seen = {}, out = [];
+    var add = function (r) { if (r && !seen[r]) { seen[r] = 1; out.push(r); } };
+    pairs.forEach(function (p) { var e = edgeBetween(p[0], p[1]); if (e) (e.source_records || []).forEach(add); });
+    (extra || []).forEach(add);
+    return out;
+  }
   function buildCrackSteps() {
     var r = roles();
     var spike = (DATA.call_spikes || [])[0];
+    var ctrl = (DATA.network_controllers || [])[0] || {};
+    var jail = r.leaders.length === 2 ? edgeBetween(r.leaders[0], r.leaders[1]) : null;
+    if (jail && (jail.rel_types || [jail.rel]).indexOf("jailed-together") < 0) jail = null;
+    var jailYear = jail && jail.start_time ? jail.start_time.slice(0, 4) : "";
+    var caseYear = (DATA.timeline.clock.anchor || "").slice(0, 4);
+    var gap = jailYear && caseYear ? Number(caseYear) - Number(jailYear) : 0;
+    var pairsWith = function (x, list) { return list.filter(Boolean).map(function (y) { return [x, y]; }); };
     crack.steps = [
-      { t: "Two clusters", nodes: r.leaders,
+      { t: "The clusters", nodes: r.leaders, recs: [],
         b: "Community detection separates the network into " + DATA.stats.communities + " clusters. The two most central figures are <b>" + esc(r.leaders[0]) + "</b> and <b>" + esc(r.leaders[1]) + "</b>. Clusters are statistical groupings, not proven organisations.",
         s: "algorithm: greedy modularity community detection" },
-      { t: "The broker", nodes: [r.burner].concat(r.leaders),
+      { t: "The broker", nodes: [r.burner].concat(r.leaders), recs: citeEdges(pairsWith(r.burner, r.leaders)),
         b: "Unresolved number <b>" + esc(r.burner) + "</b> contacts entities in both clusters. No subscriber is registered to it, so the handset holder is not established by these records.",
         s: "evidence: call detail records" },
-      { t: "Follow the money", nodes: [r.shell].concat(r.leaders),
+      { t: "Follow the money", nodes: [r.shell].concat(r.leaders), recs: citeEdges(pairsWith(r.shell, r.leaders)),
         b: "Funds converge on <b>" + esc(r.shell) + "</b> from multiple parties and are forwarded onward — the movement pattern associated with layering. Consolidation is also ordinary commerce.",
         s: "evidence: FIU-IND transaction records" },
       { t: "Potential network controller", nodes: [r.ctrl, r.shell],
-        b: "Money exits to <b>" + esc(r.ctrl) + "</b>, who is named in <b>zero FIRs</b> in this corpus — financially central, absent from the case record. Flagged as an investigative lead for review, not a finding of involvement.",
+        recs: citeEdges([[r.ctrl, r.shell]], (ctrl.source_records || []).slice(0, 3)),
+        b: "Money exits to <b>" + esc(r.ctrl) + "</b>" + (ctrl.net_inflow_inr ? " (" + inr(ctrl.net_inflow_inr) + " net)" : "") +
+          ", who is named in <b>" + (ctrl.fir_mentions || 0) + " FIRs</b> in this corpus — financially central, absent from the case record. Flagged as an investigative lead for review, not a finding of involvement." +
+          (ctrl.uncertainty && ctrl.uncertainty[0] ? " " + esc(ctrl.uncertainty[0]) : ""),
         s: "heuristic: net inflow, no FIR mention" },
-      { t: "Shared custody", nodes: r.leaders,
-        b: "Both cluster leaders overlapped in custody in 2022. Shared custody establishes proximity, not association — and it predates the case window by four years.",
+      { t: "Shared custody", nodes: r.leaders, recs: jail ? (jail.source_records || []) : [],
+        b: jail ? "Both cluster leaders overlapped in custody" + (jailYear ? " in " + esc(jailYear) : "") +
+            (jail.source ? " (" + esc(jail.source) + ")" : "") + ". Shared custody establishes proximity, not association" +
+            (gap > 0 ? " — and it predates the case window by " + gap + " years." : ".")
+          : "No shared custody is recorded between the cluster leaders in this corpus.",
         s: "evidence: e-Prisons roster" },
-      { t: "The anomaly", nodes: spike ? [r.burner].concat(r.leaders) : r.leaders,
-        b: spike ? "Communication spike: <b>" + esc(spike.pair) + "</b> reached <b>" + spike.calls_that_day + " calls</b> on " + spike.date + " — " + (spike.baseline.ratio) + "× this pair's median day. A deviation is a lead to examine, not proof of an offence."
+      { t: "The anomaly", nodes: spike ? [r.burner].concat(r.leaders) : r.leaders, recs: spike ? (spike.source_records || []) : [],
+        b: spike ? "Communication spike: <b>" + esc(spike.pair) + "</b> reached <b>" + spike.calls_that_day + " calls</b> on " + esc(spike.date) + " — " + (spike.baseline.ratio) + "× this pair's median day. A deviation is a lead to examine, not proof of an offence."
           : "No communication spike exceeded baseline in the current window.",
         s: "algorithm: per-pair volume vs baseline" },
     ];
   }
   function showCrack() {
     var st = crack.steps[crack.step];
+    var recs = (st.recs || []).slice(0, 5);
     $("ckStep").textContent = "STEP " + (crack.step + 1) + " / " + crack.steps.length;
     $("ckTitle").textContent = st.t;
-    $("ckBody").innerHTML = st.b + '<span class="src">' + esc(st.s) + "</span>";
+    $("ckBody").innerHTML = st.b + '<span class="src">' + esc(st.s) +
+      (recs.length ? " · " + recs.map(function (id) { return '<span class="chip-r" data-rec="' + esc(id) + '">[' + esc(id) + "]</span>"; }).join(" ") +
+        ((st.recs || []).length > 5 ? " +" + ((st.recs || []).length - 5) + " more" : "") : "") + "</span>";
+    $("ckBody").querySelectorAll("[data-rec]").forEach(function (x) {
+      x.onclick = function () { openRecordDrawer(x.dataset.rec); };
+    });
     $("ckPrev").disabled = crack.step === 0;
     $("ckNext").textContent = crack.step === crack.steps.length - 1 ? "Done ✓" : "Next ▶";
     // highlight
     if (NET && nodesDS) {
-      var keep = {}; (st.nodes || []).forEach(function (n) { keep[n] = 1; });
       NET.selectNodes((st.nodes || []).filter(function (n) { return n; }));
       NET.fit({ nodes: (st.nodes || []).filter(function (n) { return n; }), animation: { duration: 700 } });
     }
@@ -1117,7 +1156,7 @@
       '<h1><span class="rp-emblem">🛡</span>PRAHARI — Case Report</h1>' +
       '<div class="rp-meta">Case OP-SANGAM · Delhi–Mumbai Network · MHA / NCRB · SIH 2026</div>' +
       '<div class="rp-meta">Generated ' + esc(when) + " · by " + esc(OFFICER) + "</div>" +
-      '<div class="rp-disc">This is an AI-assisted analytical brief. Every finding is an investigative lead requiring human verification and carries no evidentiary weight. All data is synthetic.</div>' +
+      '<div class="rp-disc">This is a rule-based analytical brief assembled from the case records (no language model). Every finding is an investigative lead requiring human verification and carries no evidentiary weight. All data is synthetic.</div>' +
       "<h2>1. Case summary</h2><table><tr><th>Entities</th><td>" + s.people + "</td><th>Links</th><td>" + s.edges +
       "</td></tr><tr><th>Clusters</th><td>" + s.communities + "</td><th>FIRs parsed</th><td>" + s.firs_parsed +
       "</td></tr><tr><th>Anomaly findings</th><td>" + (s.anomalies || 0) + "</td><th>Records ingested</th><td>" + (s.records_ingested || "—") +
@@ -1136,7 +1175,7 @@
       "<table><tr><th>Target</th><th>Verdict</th><th>Officer</th><th>When</th></tr>" + decs.map(function (d) {
         return "<tr><td>" + esc(d.target) + "</td><td>" + esc(d.action.replace("_", " ")) + "</td><td>" + esc(d.officer) + "</td><td>" + esc(d.timestamp.replace("T", " ")) + "</td></tr>";
       }).join("") + "</table>" : "<p>No investigator verdicts recorded yet.</p>");
-    html += '<div class="rp-disc">AI-generated analytical summary. Requires investigator verification. Lead scores are a triage aid, not a determination of guilt.</div>';
+    html += '<div class="rp-disc">Rule-based analytical summary generated from cited records. Requires investigator verification. Lead scores are a triage aid, not a determination of guilt.</div>';
     $("reportBody").innerHTML = html;
     $("report").hidden = false;
   }
