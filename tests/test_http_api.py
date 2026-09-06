@@ -106,6 +106,40 @@ def test_casefile_over_http(client):
     assert d["firs"][0]["co_accused"], "FIR narrates a co-accused"
 
 
+def test_casefile_call_days_name_the_contacts(client):
+    """'19 calls across 11 pairs' is the corpus-wide day; the case file must
+    say who THIS person spoke to, how often, and in which direction."""
+    d = client.get("/api/entity/Salim Qureshi/casefile").json()
+    days = [m for m in d["recent_moves"] if m["type"] == "CALL_ACTIVITY"]
+    assert days, "Salim Qureshi has call activity"
+    for m in days:
+        assert m["contacts"], m
+        total = sum(c["calls"] for c in m["contacts"])
+        assert m["summary"].startswith(f"{total} call")
+        assert m["contacts"][0]["with"] in m["summary"]
+        for c in m["contacts"]:
+            assert c["outgoing"] + c["incoming"] == c["calls"] == len(c["records"])
+            assert c["with"] != "Salim Qureshi"
+            assert all(rid.startswith("CDR-") for rid in c["records"])
+        # every cited row is one of the contacts' rows, not the whole corpus day
+        assert sorted(m["records"]) == sorted(r for c in m["contacts"] for r in c["records"])
+    # the unresolved number appears by its bare number, never a guessed name
+    assert any(c["with"] == "9990001111" for m in days for c in m["contacts"])
+
+
+def test_evidence_resolves_identifiers_to_holders(client):
+    cdr = client.get("/api/evidence/CDR-0001").json()["record"]
+    res = cdr["resolved"]
+    assert set(res) >= {"caller", "receiver"}
+    for k in ("caller", "receiver"):
+        assert res[k] is None or res[k] != cdr["fields"][k]     # a name, or stated unknown
+    # the broker's number has no subscriber on file → explicitly None
+    row = next(r for r in loaders.load_cdr() if r.fields["caller"] == "9990001111")
+    assert client.get(f"/api/evidence/{row.record_id}").json()["record"]["resolved"]["caller"] is None
+    txn = client.get("/api/evidence/TXN-0009").json()["record"]
+    assert txn["resolved"] == {"from_account": "OM TRADERS PVT LTD", "to_account": "Vikram Rathore"}
+
+
 def test_evidence_lookup_and_404(client):
     r = client.get("/api/evidence/FIR_001")
     assert r.status_code == 200

@@ -209,9 +209,27 @@ def evidence(record_id: str = Path(..., max_length=64,
     if not rec:
         raise HTTPException(404, f"no such record: {record_id}")
     index = a["bundle"].ledger.record_index()
+    # Identifiers in the raw row resolved to the registered holder, so a CDR
+    # row reads "9822000004 · Javed Ansari" instead of a bare number. A phone
+    # with no subscriber on file is stated as such (None), never guessed.
+    owner: Dict[str, str] = {}
+    for ent, ids in a["bundle"].entity_identifiers.items():
+        for ph in ids.get("phones", []):
+            owner[ph] = ent
+        for ac in ids.get("accounts", []):
+            owner[ac] = ent
+    resolved: Dict[str, Optional[str]] = {}
+    for k, v in rec.fields.items():
+        if k.startswith("_") or not isinstance(v, str):
+            continue
+        if v.strip() in owner:
+            resolved[k] = owner[v.strip()]
+        elif k in ("caller", "receiver") and v.strip():
+            resolved[k] = None
     return {
         "record": {**rec.cite(), "fields": {k: v for k, v in rec.fields.items()
                                             if not k.startswith("_")},
+                   "resolved": resolved,
                    "issues": rec.issues, "timeless": rec.timeless},
         "supports": index.get(record_id, []),
         "source_type_description": config.SOURCE_TYPES.get(rec.source_type, ""),
@@ -326,10 +344,47 @@ def entity_casefile(name: str = Path(..., max_length=120),
     # --- recent moves: dated events + money movements involving this entity ---
     moves = []
     for ev in a["events"]:
+        if ev.get("type") == "CALL_ACTIVITY":
+            continue        # the corpus-wide daily aggregate; replaced below
         if ev.get("timestamp") and name in (ev.get("entities") or []):
             moves.append({"date": ev["timestamp"], "type": ev["type"],
                           "summary": ev["summary"],
                           "records": ev.get("source_records", [])[:1]})
+    # Calls: per day, WHO this entity spoke to, how often, in which direction.
+    # The timeline's "19 calls across 11 pairs" counts everyone's calls that
+    # day; an investigator reading a case file needs this person's contacts.
+    own_phones = set(a["bundle"].entity_identifiers.get(name, {}).get("phones", []))
+    by_day: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for (x, y), rs in a["bundle"].call_records.items():
+        if name not in (x, y):
+            continue
+        other = y if x == name else x
+        for r in rs:
+            if not r.timestamp:
+                continue
+            slot = by_day.setdefault(r.timestamp[:10], {})
+            c = slot.setdefault(other, {"with": other, "calls": 0, "outgoing": 0,
+                                        "incoming": 0, "duration_sec": 0, "records": []})
+            c["calls"] += 1
+            if (r.fields.get("caller") or "").strip() in own_phones:
+                c["outgoing"] += 1
+            else:
+                c["incoming"] += 1
+            try:
+                c["duration_sec"] += int(float(r.fields.get("duration_sec") or 0))
+            except (TypeError, ValueError):
+                pass
+            c["records"].append(r.record_id)
+    for day, slot in by_day.items():
+        contacts = sorted(slot.values(), key=lambda c: (-c["calls"], c["with"]))
+        total = sum(c["calls"] for c in contacts)
+        head = ", ".join(f'{c["with"]} ×{c["calls"]}' for c in contacts[:3])
+        more = f" +{len(contacts) - 3} more" if len(contacts) > 3 else ""
+        moves.append({"date": f"{day}T00:00:00", "type": "CALL_ACTIVITY",
+                      "summary": f"{total} call{'s' if total != 1 else ''} with "
+                                 f"{len(contacts)} contact{'s' if len(contacts) != 1 else ''}: {head}{more}",
+                      "records": [rid for c in contacts for rid in c["records"]],
+                      "contacts": contacts})
     d = G.nodes[name]
     # Transactions come straight from the bank rows this person is party to,
     # so each move carries its own date and its own record — not the edge's

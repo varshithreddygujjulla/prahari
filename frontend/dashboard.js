@@ -564,9 +564,13 @@
       // ---- recent moves ----
       html += '<div class="sec-h" style="margin-top:16px">🕐 Recent moves</div>';
       if ((cf.recent_moves || []).length) {
-        html += '<div class="cf-moves">' + cf.recent_moves.map(function (m) {
+        html += '<div class="cf-moves">' + cf.recent_moves.map(function (m, i) {
           var ic = MOVE_ICON[m.type] || ["•", "#8b949e"];
-          return '<div class="cf-move"' + (m.records && m.records[0] ? ' data-rec="' + esc(m.records[0]) + '"' : "") + ">" +
+          // A call day opens the contact breakdown (who, how often, which
+          // direction); any other move opens its source record.
+          var attr = m.contacts ? ' data-calls="' + i + '"' :
+            (m.records && m.records[0] ? ' data-rec="' + esc(m.records[0]) + '"' : "");
+          return '<div class="cf-move"' + attr + ' title="' + (m.contacts ? "Show who was called" : "Open source record") + '">' +
             '<span class="cf-dot" style="background:' + ic[1] + '">' + ic[0] + "</span>" +
             '<span class="cf-date">' + esc((m.date || "").slice(0, 10)) + "</span>" +
             '<span class="cf-sum">' + esc(m.summary) + "</span></div>";
@@ -578,7 +582,38 @@
       b.innerHTML = html;
       b.querySelectorAll("[data-goto]").forEach(function (x) { x.onclick = function () { openEntity(x.dataset.goto); }; });
       b.querySelectorAll("[data-rec]").forEach(function (x) { x.onclick = function () { openRecordDrawer(x.dataset.rec); }; });
+      b.querySelectorAll("[data-calls]").forEach(function (x) {
+        x.onclick = function () { openCallsDrawer(e.entity, cf.recent_moves[+x.dataset.calls]); };
+      });
     }).catch(function () { b.innerHTML = '<div class="ent-empty">Could not load case file.</div>'; });
+  }
+
+  // "Who did he talk to?" — one day's calls for one entity, by counterparty,
+  // with direction, total duration and every underlying CDR row as a chip.
+  function fmtDur(s) {
+    s = Number(s || 0); if (s < 60) return s + "s";
+    var m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + "h " + (m % 60) + "m" : m + "m " + (s % 60) + "s";
+  }
+  function openCallsDrawer(entity, m) {
+    var day = (m.date || "").slice(0, 10);
+    var total = m.contacts.reduce(function (n, c) { return n + c.calls; }, 0);
+    var html = dwSec("Summary", '<div class="dw-txt"><b>' + esc(entity) + "</b> had <b>" + total +
+      " call" + (total === 1 ? "" : "s") + "</b> with <b>" + m.contacts.length + " contact" +
+      (m.contacts.length === 1 ? "" : "s") + "</b> on " + esc(day) + ". Each row is a registered subscriber " +
+      "or, where no subscriber is on file, the bare number.</div>");
+    html += dwSec("Contacts (most calls first)", m.contacts.map(function (c) {
+      var known = DATA.nodes.some(function (n) { return n.id === c.with; });
+      return '<div class="dw-rec" style="cursor:default"><span class="rt">' + c.calls + " call" + (c.calls === 1 ? "" : "s") +
+        " · " + c.outgoing + " out / " + c.incoming + " in · " + fmtDur(c.duration_sec) + "</span>" +
+        '<span class="rid">' + (known ? '<span class="chip-e" data-ent="' + esc(c.with) + '">' + esc(c.with) + " ↗</span>" : esc(c.with)) + "</span>" +
+        '<div class="rd">' + c.records.map(function (id) {
+          return '<span class="chip-r" data-rec="' + esc(id) + '">[' + esc(id) + "]</span>"; }).join(" ") + "</div></div>";
+    }).join(""));
+    html += '<div class="disc">Call detail records are metadata only — who called whom, when, for how long. No call content exists in this system.</div>';
+    $("dwTitle").textContent = "Calls · " + day;
+    $("dwBody").innerHTML = html; $("drawer").hidden = false; wireRecs();
+    $("dwBody").querySelectorAll("[data-ent]").forEach(function (x) {
+      x.onclick = function () { closeDrawer(); openEntity(x.dataset.ent); }; });
   }
 
   function entNotes(e) {
@@ -1129,10 +1164,19 @@
   function openRecordDrawer(id) {
     api("/api/evidence/" + encodeURIComponent(id)).then(function (d) {
       if (d.detail) { toast(d.detail); return; }
-      var rec = d.record;
+      var rec = d.record, res = rec.resolved || {};
+      // Identifiers show the registered holder beside the raw value, so an
+      // officer reads "9822000004 · Javed Ansari", and a number with no
+      // subscriber on file says so instead of standing bare.
       var fields = Object.keys(rec.fields || {}).map(function (k) {
         var v = rec.fields[k]; if (Array.isArray(v)) v = v.join(", ");
-        return '<div class="dw-kv"><span>' + esc(k) + "</span>" + esc(v) + "</div>";
+        var who = "";
+        if (k in res) {
+          who = res[k] === null
+            ? ' <span style="color:var(--muted)">· no subscriber on file</span>'
+            : ' <span class="chip-e" data-ent="' + esc(res[k]) + '" style="color:var(--accent2);cursor:pointer">· ' + esc(res[k]) + " ↗</span>";
+        }
+        return '<div class="dw-kv"><span>' + esc(k) + "</span><span style=\"color:var(--text2);text-align:right\">" + esc(v) + who + "</span></div>";
       }).join("");
       var html = dwSec("Source", '<div class="dw-kv"><span>Record</span>' + esc(rec.record_id) + "</div>" +
         '<div class="dw-kv"><span>File</span>' + esc(rec.source_file) + "</div>" +
@@ -1146,6 +1190,8 @@
         }).join(""));
       $("dwTitle").textContent = "Record " + id;
       $("dwBody").innerHTML = html; $("drawer").hidden = false; wireRecs();
+      $("dwBody").querySelectorAll("[data-ent]").forEach(function (x) {
+        x.onclick = function () { closeDrawer(); openEntity(x.dataset.ent); }; });
     }).catch(function () { toast("Record not found: " + id); });
   }
 
