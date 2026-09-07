@@ -91,10 +91,28 @@
       renderER();
       renderFullTimeline();
       renderAlerts();
+      applyDeepLink();
     }).catch(function (e) {
       $("statStrip").innerHTML = '<span class="stat-i" style="color:var(--red)">Could not load case data: ' + esc(String(e)) + " — is the server running?</span>";
       toast("Failed to load case data: " + e); console.error(e);
     });
+  }
+
+  // Deep links: /?view=leads · /?entity=Ramesh%20Yadav&tab=casefile — so a
+  // view or dossier can be shared, bookmarked, or opened straight from a doc.
+  function applyDeepLink() {
+    var q = new URLSearchParams(location.search);
+    var view = q.get("view"), ent = q.get("entity"), tab = q.get("tab");
+    if (view && VIEW_TITLE[view]) showView(view);
+    if (q.get("full") === "1" && NET) setTimeout(toggleGraphFull, 400);   // /?full=1 → graph fills the window
+    if (ent && DATA.nodes.some(function (n) { return n.id === ent; })) {
+      if (tab) ENT_TAB = tab;
+      api("/api/entity/" + encodeURIComponent(ent)).then(function (e) {
+        CUR = e; if (tab) ENT_TAB = tab;
+        renderEntity(e, "entityPanel"); renderEntity(e, "entityPanel2");
+        if (NET) { NET.selectNodes([ent]); NET.focus(ent, { scale: 0.9, animation: false }); }
+      });
+    }
   }
 
   function decisionOf(kind, target) { return DECISIONS[kind + ":" + target]; }
