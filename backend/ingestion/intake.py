@@ -27,6 +27,7 @@ import io
 import json
 import os
 import re
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -638,9 +639,22 @@ def _write_fir(rec: Dict[str, Any]) -> str:
     return fid
 
 
+# Record ids are positional and FIR ids are "highest + 1", so two commits
+# racing would number the same rows (wrong batch ids, overwritten FIR files).
+# One lock covers validate-number-write.
+_COMMIT_LOCK = threading.Lock()
+
+
 def commit(source_type: str, fmt: str, payload: str,
            mapping: Optional[Dict[str, str]] = None,
            include_conflicts: bool = False) -> Dict[str, Any]:
+    with _COMMIT_LOCK:
+        return _commit(source_type, fmt, payload, mapping, include_conflicts)
+
+
+def _commit(source_type: str, fmt: str, payload: str,
+            mapping: Optional[Dict[str, str]] = None,
+            include_conflicts: bool = False) -> Dict[str, Any]:
     """Validate again, then append committable records to the store.
 
     Conflicting rows are skipped by default (never overwrite); pass

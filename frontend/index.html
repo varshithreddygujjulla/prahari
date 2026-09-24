@@ -783,10 +783,10 @@ const steps=()=>[
     const sp=(DATA&&DATA.call_spikes&&DATA.call_spikes[0])||null;
     if(!sp)return "No call-volume anomalies exceeded baseline in the current window.";
     const b=sp.baseline||{};
-    return `Burst detection: <strong>${sp.pair}</strong> reached `+
-      `<strong>${sp.calls_that_day} calls</strong> on ${sp.date} \u2014 `+
-      `<strong>${b.ratio}\u00d7</strong> this pair\u2019s median active day of `+
-      `${b.baseline}. Rated ${sp.severity} at ${sp.confidence}% confidence. `+
+    return `Burst detection: <strong>${esc(sp.pair)}</strong> reached `+
+      `<strong>${esc(sp.calls_that_day)} calls</strong> on ${esc(sp.date)} \u2014 `+
+      `<strong>${esc(b.ratio)}\u00d7</strong> this pair\u2019s median active day of `+
+      `${esc(b.baseline)}. Rated ${esc(sp.severity)} at ${esc(sp.confidence)}% confidence. `+
       `A deviation is a lead to examine, not proof of an offence.`;
   })(),
   src:"algorithm: per-pair daily volume vs pair-specific median baseline",
@@ -850,7 +850,7 @@ async function tamperDemo(){
   toast("\u26a0 ROGUE EDIT DETECTED \u2014 HASH CHAIN BROKEN AT BLOCK "+d.first_broken_block);
   logEntry("AUDIT ALERT","red",
     `A past query record was silently altered. SHA-256 chain verification failed at `+
-    `block <strong>${d.first_broken_block}</strong> \u2014 every later seal is now invalid. `+
+    `block <strong>${esc(d.first_broken_block)}</strong> \u2014 every later seal is now invalid. `+
     `Tampering cannot be hidden in this system.`,
     "source: SHA-256 blockchain evidence log");
   setTimeout(()=>{toast("\u2714 RECORD RESTORED \u2014 LOG SEALED AGAIN");loadAudit();},reduceMotion?800:3000);
